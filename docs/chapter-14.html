@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Глава 14 · копирование</title>
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --panel: #fff;
+      --ink: #1a1a1a;
+      --muted: #5c5c5c;
+      --line: #ddd6c8;
+      --accent: #4a5d7a;
+      --accent-hover: #3a4d64;
+      --ok: #2d6a4f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font: 16px/1.55 "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      padding: 24px 16px 40px;
+    }
+    main {
+      max-width: 820px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 6px;
+    }
+    .lead {
+      margin: 0 0 20px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .copy-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+    }
+    .copy-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #faf8f4;
+    }
+    .copy-toolbar span {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .copy-btn {
+      appearance: none;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { background: var(--accent-hover); }
+    .copy-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .copy-btn.ok { background: var(--ok); }
+    #chapter-text {
+      display: block;
+      width: 100%;
+      min-height: 70vh;
+      margin: 0;
+      padding: 16px 18px;
+      border: none;
+      resize: vertical;
+      font: 0.92rem/1.55 ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+      color: var(--ink);
+      background: var(--panel);
+      user-select: text;
+    }
+    #chapter-text:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 2px rgba(74, 93, 122, 0.25);
+    }
+    .hint {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Глава 14. Вывод ведущего приближения (алгоритм Хасминского)</h1>
+    <p class="lead">Отдельный блок для копирования — без выделения всего чата. Кнопка копирует весь текст §14 в буфер обмена.</p>
+
+    <div class="copy-panel">
+      <div class="copy-toolbar">
+        <span>§14 · УФПК (2.5), алгоритм Хасминского</span>
+        <button type="button" class="copy-btn" id="copy-btn" aria-live="polite">Копировать</button>
+      </div>
+      <textarea id="chapter-text" readonly spellcheck="false" aria-label="Текст главы 14"></textarea>
+    </div>
+
+    <p class="hint">Можно также выделить фрагмент вручную внутри поля — границы выделения не «уплывают» за пределы блока.</p>
+  </main>
+
+  <script id="chapter-source" type="text/plain">
+## 14. Вывод ведущего приближения (алгоритм Хасминского)
+
+**§14** — основной вычислительный блок для статьи в **ПММ**: прямой вывод **q(θ|r)**, **f_R(r)**, **p^(0)** из уравнения (2.5) и проверка **E[r²]**. Ссылается на утверждение §13.3.
+
+### Шаг 1. Быстрая θ и медленная r
+
+**Полярные координаты:** ω₁ = r sin θ, ω₂ = r cos θ, r ≥ 0.
+
+Из (2.5) в полярной форме (главные члены):
+
+```
+b_r = −ε² · α · r                    — радиальный дрейф (только трение)
+b_θ = κ · r² · sin θ                 — тангенциальный дрейф (связь κ)
+```
+
+```
+dθ/dt = b_θ / r² = κ · sin θ         — O(1), быстрая переменная
+dr/dt = b_r = −ε² · α · r            — O(ε²), медленная переменная
+```
+
+**Шум:** **σ = ε·σ₀**, изотропный → радиальная и угловая диффузия порядка **ε²**.
+
+**Масштабы времени:**
+
+| Переменная | τ |
+|-----------|---|
+| **θ** | **O(1)** |
+| **r** | **O(1/ε²)** |
+| **E = r²/2** | **O(1/ε²)** |
+
+---
+
+### Шаг 2. Угловая плотность q(θ | r)
+
+**Стационарное уравнение на окружности** при фиксированном **r** (быстрый оператор **L_0**, §13.2):
+
+```
+L_0^* q = −(1/r) · ∂/∂θ ( b_θ · q ) + O(ε²)
+```
+
+На ведущем порядке — **1D-УФПК на окружности** (угол **θ**, параметр **r**):
+
+```
+∂/∂θ ( κ · sin θ · q  −  D_θ(r) · ∂q/∂θ ) = 0
+```
+
+**Угловая диффузия** (из изотропного шума **ε·σ₀** при фикс. **r**):
+
+```
+D_θ(r) = ε² · σ₀² / (2 · r²) = ε² · ν / (2 · A · r²)
+```
+
+**Решение** (нормировка **∫₀^{2π} q dθ = 1**):
+
+```
+q(θ | r) = (1 / Z(r)) · exp( −Λ(r) · cos θ )
+```
+
+```
+Λ(r) = κ / D_θ(r) = 2 · κ · r² · A / (ε² · ν) = 2 · κ · β · r² / ε²
+```
+
+**Нормировочная константа** (модифицированная функция Бessel):
+
+```
+Z(r) = ∫₀^{2π} exp( −Λ(r) · cos θ ) dθ = 2π · I₀( Λ(r) )
+```
+
+**Пределы:**
+
+```
+Λ → 0  (ε → 0 при фикс. r):   q(θ | r) → 1/(2π)     (равномерное)
+Λ ≫ 1:                        q концентрируется у θ = 0  (cos θ = 1)
+```
+
+**O(ε²)-поправка к q:** учёт медленного члена в уравнении для **q** → **q = q₀ + ε² q₁ + …** (§15).
+
+---
+
+### Шаг 3. Усреднённые b̄(r) и D̄(r)
+
+Усредняем медленный оператор **L_1** по **q(θ | r)**:
+
+```
+⟨f⟩_q = ∫₀^{2π} f(θ) · q(θ | r) dθ
+```
+
+**Радиальный дрейф** (из **b_f**):
+
+```
+e_r = ( sin θ , cos θ )     (единичный «радиальный» вектор)
+b_f · e_r = −α · r · ( sin²θ + cos²θ ) = −α · r
+```
+
+```
+b̄(r) = ⟨b_f · e_r⟩_q = −α · r          — не зависит от q
+```
+
+**Диффузия** (изотропная):
+
+```
+D̄(r) = σ₀² = ν / A                     — на ведущем порядке
+```
+
+**Усреднённый медленный SDE** (в медленном времени **τ = ε²·t**):
+
+```
+dr = −α · r · dτ  +  σ₀ · dW_τ
+```
+
+---
+
+### Шаг 4. 1D-УФПК для f_R(r)
+
+**Стационарное уравнение** для маргинальной плотности **f_R(r)** (мера **dr**):
+
+```
+−(d/dr)( α · r · f_R ) + (σ₀²/2) · (1/r) · (d/dr)( r · d f_R / dr ) = 0
+```
+
+**Решение:**
+
+```
+f_R(r) = 2 · β · r · exp( −β · r² ) ,   r ≥ 0 ,   β = α·A / ν
+```
+
+**Проверка моментов:**
+
+```
+E[r²] = ∫₀^∞ r² · f_R(r) dr = ν / (2·α·A)
+E[E] = E[r²/2] = ν / (4·α·A)
+```
+
+---
+
+### Шаг 5. Восстановление p^(0)(ω₁, ω₂)
+
+**Итоговая 2D-плотность** (мера **r dr dθ**):
+
+```
+p(r, θ) = f_R(r) · q(θ | r) / r
+```
+
+**Подстановка** **f_R**:
+
+```
+p(r, θ) = 2 · β · exp( −β · r² ) · q(θ | r)
+```
+
+**Сравнение с p₀:**
+
+```
+p₀ = (β/π) · exp( −β · r² )
+p(r, θ) = p₀(r) · 2π · q(θ | r)
+```
+
+**При равномерном q = 1/(2π):**
+
+```
+p(r, θ) = p₀(r) = (β/π) · exp( −β · r² )     — гаусс
+```
+
+**В декартовых координатах:**
+
+```
+p(ω₁, ω₂) = 2 · β · exp( −β · (ω₁² + ω₂²) ) · q( θ(ω₁, ω₂) | r ) / (2π)
+```
+
+```
+r = √(ω₁² + ω₂²) ,   cos θ = ω₂ / r ,   sin θ = ω₁ / r
+```
+
+**Явная формула (результат §13.3):**
+
+```
+p^(0)(ω₁, ω₂) = (β/π) · exp( −β · r² ) · exp( −Λ(r) · cos θ ) / I₀( Λ(r) )
+```
+
+```
+Λ(r) = 2 · κ · β · r² / ε²
+```
+
+**Проверка:** при **q = 1/(2π)** получаем **p^(0) = p₀** (§4). Маргинальная по **r** — **f_R** (шаг 4).
+
+---
+
+### Шаг 6. Поправки ε², ε⁴ — Чепмен–Энског
+
+Поправки **p₁**, **p₂** к **p^(0)** — **§15**. Для **ПММ** ведущий результат — шаги 1–5; §15 — уточнение 2D-картины.
+  </script>
+
+  <script>
+    (function () {
+      var source = document.getElementById("chapter-source");
+      var field = document.getElementById("chapter-text");
+      var btn = document.getElementById("copy-btn");
+      var defaultLabel = btn.textContent;
+      var resetTimer;
+
+      field.value = source.textContent.replace(/^\n/, "");
+
+      function flashCopied() {
+        btn.textContent = "Скопировано!";
+        btn.classList.add("ok");
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(function () {
+          btn.textContent = defaultLabel;
+          btn.classList.remove("ok");
+        }, 1800);
+      }
+
+      async function copyAll() {
+        var text = field.value;
+        try {
+          await navigator.clipboard.writeText(text);
+          flashCopied();
+          return;
+        } catch (err) {
+          field.focus();
+          field.select();
+          field.setSelectionRange(0, text.length);
+          try {
+            if (document.execCommand("copy")) {
+              flashCopied();
+              return;
+            }
+          } catch (fallbackErr) {
+            /* ignore */
+          }
+        }
+        btn.textContent = "Выделите Ctrl+C";
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(function () {
+          btn.textContent = defaultLabel;
+        }, 2500);
+      }
+
+      btn.addEventListener("click", copyAll);
+    })();
+  </script>
+</body>
+</html>
