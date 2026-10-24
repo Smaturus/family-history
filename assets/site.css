@@ -36,7 +36,7 @@
   --navh:64px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;overflow-x:clip}
+html{-webkit-text-size-adjust:100%;overflow-x:clip}
 body{background:var(--porcelain);color:var(--ink);font-family:var(--sans);font-size:18.5px;line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:clip;padding-top:var(--navh)}
 h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);font-weight:500;letter-spacing:-.01em}
 b,strong{font-weight:600;color:var(--ink)}
@@ -323,6 +323,7 @@ footer b{color:var(--hero-ink)}
    к ближним, прорисовка хребта, медленное дыхание точек света, смена
    контекста навигации (transition выше). Только при разрешённой анимации. */
 @media (prefers-reduced-motion: no-preference){
+  html{scroll-behavior:smooth}
   .hero-copy>*{opacity:0;transform:translateY(14px);animation:rise .7s cubic-bezier(.2,.6,.2,1) forwards}
   .hero-copy>*:nth-child(2){animation-delay:.08s}
   .hero-copy>*:nth-child(3){animation-delay:.16s}

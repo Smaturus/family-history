@@ -736,7 +736,10 @@ def render_pedigree_svg(
 
     return (
         f'<svg class="pedigree" viewBox="0 0 {width} {height:.0f}" '
-        f'xmlns="http://www.w3.org/2000/svg" style="min-width:{width}px">'
+        f'xmlns="http://www.w3.org/2000/svg" style="min-width:{width}px" '
+        f'role="img" aria-labelledby="pedigree-title pedigree-desc">'
+        f'<title id="pedigree-title">{esc(content["tree"]["h1"])}</title>'
+        f'<desc id="pedigree-desc">{esc(content["tree"]["lead"])}</desc>'
         + "".join(parts)
         + "</svg>"
     )
@@ -1803,8 +1806,9 @@ def render_nav(meta_content: dict[str, Any]) -> str:
     for index, item in enumerate(meta_content["nav_items"]):
         active = " active" if index == 0 else ""
         nid = f' id="nb{index + 1}"' if index == 0 else ""
+        aria = ' aria-current="true"' if index == 0 else ""
         items.append(
-            f'<button class="navbtn{active}"{nid} type="button" '
+            f'<button class="navbtn{active}"{nid}{aria} type="button" '
             f'data-nav="{esc(item["target"])}">{esc(item["label"])}</button>'
         )
     items.append(
@@ -2161,7 +2165,7 @@ def render_tree_page(
   </div>
 </section>
 
-<section class="treewrap">
+<section class="treewrap" tabindex="0" role="region" aria-label="{esc(tree["h1"])}">
   <div class="wrap" style="max-width:none">{pedigree_svg}
     <div class="legend">
       <span><i class="ok"></i>{esc(tree["legend"]["ok"])}</span>
@@ -2230,7 +2234,13 @@ function showPage(n) {
   document.getElementById('page2').classList.toggle('visible', n===2);
   document.querySelectorAll('nav .navbtn').forEach(function(btn) {
     var isTree = btn.getAttribute('data-nav') === 'tree';
-    btn.classList.toggle('active', n===2 ? isTree : (!isTree && btn.id === 'nb1'));
+    var isActive = n===2 ? isTree : (!isTree && btn.id === 'nb1');
+    btn.classList.toggle('active', isActive);
+    if (isActive) {
+      btn.setAttribute('aria-current', 'true');
+    } else {
+      btn.removeAttribute('aria-current');
+    }
   });
   if (n === 2) {
     window.scrollTo({top:0});
