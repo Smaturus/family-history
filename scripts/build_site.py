@@ -1794,6 +1794,7 @@ def render_document_start(meta_content: dict[str, Any], css: str) -> str:
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" type="image/avif" imagesrcset="{HERO_SRCSET_AVIF}" imagesizes="{HERO_SIZES}" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<noscript><style>.page{{display:block}}</style></noscript>
 <style>{css}</style>
 </head>
 <body class="over-hero">

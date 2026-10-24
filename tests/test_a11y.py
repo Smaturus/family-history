@@ -40,6 +40,13 @@ def test_nav_active_state_announced(tmp_path):
     assert 'lang="ru"' in html
 
 
+def test_noscript_fallback_makes_pages_visible(tmp_path):
+    """Без JS обе страницы видимы: noscript-стиль переопределяет display:none."""
+    code, log, html = build_in_tmp(tmp_path)
+    assert code == 0, log
+    assert "<noscript><style>.page{display:block}</style></noscript>" in html
+
+
 def test_focus_visible_style_present():
     """Глобальный focus-ring объявлен в CSS, smooth-scroll уважает reduced-motion."""
     css = Path(__file__).resolve().parents[1] / "assets" / "site.css"
