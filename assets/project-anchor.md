@@ -5,8 +5,8 @@
 
 ## Готово на `master`
 
-- **Live:** https://smaturus.github.io/github-slideshow/
-- **Репозиторий:** Smaturus/github-slideshow
+- **Live:** https://smaturus.github.io/family-history/
+- **Репозиторий:** Smaturus/family-history
 - **README** — короткий обзор; глубина — в `docs/architecture.md`
 - **Hero:** фон = `assets/Image 1.png`; раскладка = `assets/Image 2.png`
 - **Pages allowlist:** `index.html`, `.nojekyll`, `assets/hero-bg*.{avif,webp,jpg}`
