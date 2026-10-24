@@ -282,7 +282,7 @@ body.over-hero .navbtn.active{color:#F0EBE3}
 .pedigree .bdg{font-size:10px;font-weight:500;letter-spacing:.02em}
 .pedigree .bg{stroke:none}
 .pedigree .bx{transition:opacity .15s}
-/* Подтверждено — стальной серо-синий */
+/* Есть в базе (карточка без плашки) — стальной серо-синий */
 .pedigree .bx.ok .fr{stroke:var(--steel)}
 .pedigree .bx.ok .bg{fill:var(--steel-tint)}
 .pedigree .bx.ok .bdg{fill:var(--steel-ink)}

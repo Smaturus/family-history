@@ -9,10 +9,9 @@ meta:
   nav_items:
     - {label: "О проекте", target: "top"}
     - {label: "Ветви", target: "line"}
-    - {label: "Документы", target: "sources"}
+    - {label: "Источники", target: "sources"}
     - {label: "Места", target: "places"}
     - {label: "Хроника", target: "timeline"}
-    - {label: "Контакты", target: "contacts"}
   nav_tree: "Древо"
 
 hero:
@@ -292,7 +291,7 @@ tree:
   missing_father: "отец не найден"
   missing_mother: "мать не найдена"
   legend:
-    ok: "Подтверждено — предок с записью в базе"
+    ok: "Карточка без плашки — предок есть в базе MyHeritage; запись базы не является документальным подтверждением"
     hyp: "Гипотеза — нет источника, дата вычислена или отсутствует"
     q: "Нет данных — предок не найден, цель поиска"
     anchor: "Семья, от которой ведётся отсчёт"

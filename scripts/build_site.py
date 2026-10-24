@@ -633,7 +633,13 @@ def render_connectors(node: TreeNode, max_gen: int) -> list[str]:
 
 
 def render_badge(x: float, cy: float, status: str, labels: dict[str, str]) -> str:
-    """Status pill in the lower-left corner of a tree card."""
+    """Status pill in the lower-left corner of a tree card.
+
+    «ok» (есть запись в базе) не отрисовывается: наличие записи в выгрузке
+    MyHeritage — дефолтное состояние, а не статус, и слово «Подтверждено»
+    ложно намекало на документальное подтверждение."""
+    if status == "ok":
+        return ""
     width = STATUS_BADGE_W[status]
     return (
         f'<rect class="bg" x="{x + 12}" y="{cy + 18:.1f}" width="{width}" '
@@ -2169,7 +2175,7 @@ def render_tree_page(
 <section class="treewrap" tabindex="0" role="region" aria-label="{esc(tree["h1"])}">
   <div class="wrap" style="max-width:none">{pedigree_svg}
     <div class="legend">
-      <span><i class="ok"></i>{esc(tree["legend"]["ok"])}</span>
+      <span>{esc(tree["legend"]["ok"])}</span>
       <span><i class="hyp"></i>{esc(tree["legend"]["hyp"])}</span>
       <span><i class="q"></i>{esc(tree["legend"]["q"])}</span>
       <span><i class="anchor"></i>{esc(tree["legend"]["anchor"])}</span>
