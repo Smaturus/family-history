@@ -93,6 +93,15 @@
 1 DEAT Y
 2 DATE 2015
 1 FAMS @F3@
+0 @I6@ INDI
+1 NAME Zhivoy /Testin/
+2 GIVN Zhivoy
+2 SURN Testin
+1 SEX M
+1 BIRT
+2 DATE 17 APR 1975
+2 PLAC Тестовый город
+1 FAMC @F3@
 0 @F0@ FAM
 1 HUSB @I1@
 1 WIFE @I2@
@@ -112,4 +121,5 @@
 1 HUSB @I4@
 1 WIFE @I5@
 1 CHIL @I2@
+1 CHIL @I6@
 0 TRLR

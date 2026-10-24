@@ -47,7 +47,9 @@
 │   ├── parse_gedcom.py          # парсер GEDCOM, фильтр приватности, архивные вставки (1834 г.)
 │   ├── build_site.py            # генератор index.html: рендер секций, валидация YAML, privacy-проверка
 │   └── grade_hero_bg.py         # офлайн-регрейд hero-фона (нужны numpy и Pillow — см. requirements-dev.txt)
-├── tests/fixtures/minimal.ged   # синтетическая фикстура GEDCOM для CI-сборки (вымышленные люди)
+├── tests/
+│   ├── fixtures/minimal.ged    # синтетический GEDCOM для тестов и CI (вымышленные люди)
+│   └── test_parser.py          # pytest: парсер, inject 1834 г., фильтр приватности
 ├── assets/
 │   ├── site.css                 # стили (инлайнятся в index.html при сборке)
 │   ├── Image 1.png / Image 2.png  # мастер фона hero и референс раскладки (в Pages не публикуются)
