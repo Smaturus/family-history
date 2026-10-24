@@ -1,0 +1,115 @@
+0 HEAD
+1 SOUR FAMILY_HISTORY_FIXTURE
+1 GEDC
+2 VERS 5.5.1
+1 DATE 24 OCT 2026
+0 @I1@ INDI
+1 NAME Testin Testovich /Testin/
+2 GIVN Testin Testovich
+2 SURN Testin
+1 SEX M
+1 BIRT
+2 DATE 1971
+1 FAMC @F1@
+1 FAMS @F0@
+0 @I2@ INDI
+1 NAME Testovna /Testova/
+2 GIVN Testovna
+2 SURN Testova
+1 SEX F
+1 BIRT
+2 DATE 1974
+1 FAMC @F3@
+1 FAMS @F0@
+0 @I3@ INDI
+1 NAME Testinovich /Testin/
+2 GIVN Testinovich
+2 SURN Testin
+1 SEX M
+1 BIRT
+2 DATE 2001
+1 FAMC @F0@
+0 @I107@ INDI
+1 NAME Andrei Testovich /Testin/
+2 GIVN Andrei Testovich
+2 SURN Testin
+1 SEX M
+1 BIRT
+2 DATE 1950
+1 FAMC @F2@
+1 FAMS @F1@
+0 @I108@ INDI
+1 NAME Anna Petrovna /Testina/
+2 GIVN Anna Petrovna
+2 SURN Testina
+1 SEX F
+1 BIRT
+2 DATE 1952
+1 DEAT Y
+2 DATE BEF 2020
+1 FAMS @F1@
+0 @I155@ INDI
+1 NAME Fedot /Testin/
+2 GIVN Fedot
+2 SURN Testin
+1 SEX M
+1 BIRT
+2 DATE BEF 1852
+1 FAMC @F59@
+1 FAMS @F2@
+0 @I109@ INDI
+1 NAME Feodora /Testina/
+2 GIVN Feodora
+2 SURN Testina
+1 SEX F
+1 DEAT Y
+2 DATE BEF 1920
+1 FAMS @F2@
+0 @I163@ INDI
+1 NAME ?????? /??????/
+2 GIVN ??????
+2 SURN ??????
+1 SEX M
+1 DEAT Y
+2 DATE BEF 1900
+1 FAMS @F59@
+0 @I4@ INDI
+1 NAME Test Testovich /Testov/
+2 GIVN Test Testovich
+2 SURN Testov
+1 SEX M
+1 BIRT
+2 DATE 1940
+1 DEAT Y
+2 DATE 2010
+1 FAMS @F3@
+0 @I5@ INDI
+1 NAME Testovna /Testova/
+2 GIVN Testovna
+2 SURN Testova
+1 SEX F
+1 BIRT
+2 DATE 1945
+1 DEAT Y
+2 DATE 2015
+1 FAMS @F3@
+0 @F0@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I3@
+0 @F1@ FAM
+1 HUSB @I107@
+1 WIFE @I108@
+1 CHIL @I1@
+0 @F2@ FAM
+1 HUSB @I155@
+1 WIFE @I109@
+1 CHIL @I107@
+0 @F59@ FAM
+1 HUSB @I163@
+1 CHIL @I155@
+0 @F3@ FAM
+1 HUSB @I4@
+1 WIFE @I5@
+1 CHIL @I2@
+0 TRLR

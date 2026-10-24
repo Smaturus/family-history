@@ -6,6 +6,8 @@ from __future__ import annotations
 import html
 import math
 import random
+import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -2349,7 +2351,38 @@ def build_html(
     )
 
 
+def validate_inputs() -> None:
+    """Fail fast with a clear message when input files are missing or unreadable."""
+    if not CONTENT_PATH.exists():
+        sys.exit(f"Ошибка: не найден {CONTENT_PATH.relative_to(ROOT)} — файл редакционных текстов обязателен для сборки.")
+
+    if not GEDCOM_PATH.exists():
+        sys.exit(
+            f"Ошибка: файл GEDCOM не найден ({GEDCOM_PATH.relative_to(ROOT)}).\n"
+            "Положите экспорт MyHeritage в data/skiba.ged (файл не коммитится) и запустите сборку снова."
+        )
+
+    raw = GEDCOM_PATH.read_bytes()
+    if not raw.strip():
+        sys.exit(f"Ошибка: файл GEDCOM пуст ({GEDCOM_PATH.relative_to(ROOT)}).")
+
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        sys.exit(
+            f"Ошибка: файл GEDCOM не в кодировке UTF-8 (байт {exc.start}).\n"
+            "Пересохраните экспорт MyHeritage в UTF-8 и запустите сборку снова."
+        )
+
+    if not re.search(r"^0 .*INDI", text, re.MULTILINE):
+        sys.exit(
+            f"Ошибка: в {GEDCOM_PATH.relative_to(ROOT)} нет записей INDI — файл не похож на GEDCOM-экспорт.\n"
+            "Проверьте, что это выгрузка древа (GEDCOM 5.5.1), а не другой файл."
+        )
+
+
 def main() -> None:
+    validate_inputs()
     content = load_content()
     people, families, meta = parse_gedcom(GEDCOM_PATH)
     html_content = build_html(people, families, meta, content)

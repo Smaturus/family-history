@@ -1,0 +1,37 @@
+name: CI build smoke test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      # Реальный GEDCOM с ПДн в CI не попадает (см. ADR «CI-сборка на фикстуре»):
+      # вместо data/skiba.ged используется синтетическая фикстура с вымышленными людьми.
+      - name: Prepare fixture GEDCOM
+        run: |
+          mkdir -p data
+          cp tests/fixtures/minimal.ged data/skiba.ged
+
+      - name: Build site
+        run: python scripts/build_site.py
+
+      - name: Verify output integrity
+        run: |
+          test -f index.html
+          grep -q "<svg" index.html
+          grep -q 'id="page2"' index.html
