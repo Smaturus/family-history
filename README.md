@@ -33,7 +33,8 @@
 
 - Python 3, PyYAML; GEDCOM 5.5.1
 - Статический HTML, CSS и SVG
-- GitHub Actions и GitHub Pages
+- pytest — тесты парсера/приватности и a11y собранного сайта
+- GitHub Actions: `ci.yml` (тесты + smoke-сборка на фикстуре) и Pages
 
 ---
 
@@ -49,7 +50,8 @@
 │   └── grade_hero_bg.py         # офлайн-регрейд hero-фона (нужны numpy и Pillow — см. requirements-dev.txt)
 ├── tests/
 │   ├── fixtures/minimal.ged    # синтетический GEDCOM для тестов и CI (вымышленные люди)
-│   └── test_parser.py          # pytest: парсер, inject 1834 г., фильтр приватности
+│   ├── test_parser.py          # pytest: парсер, inject 1834 г., фильтр приватности
+│   └── test_a11y.py            # pytest: a11y собранного HTML (title/desc, tabindex, aria)
 ├── assets/
 │   ├── site.css                 # стили (инлайнятся в index.html при сборке)
 │   ├── Image 1.png / Image 2.png  # мастер фона hero и референс раскладки (в Pages не публикуются)
@@ -58,10 +60,13 @@
 │   ├── architecture.md          # архитектура и инженерные решения
 │   └── decisions.md             # ADR, кратко
 ├── index.html                   # собранный сайт (коммитится после локальной сборки)
-├── .github/workflows/pages.yml  # публикация allowlist-файлов в gh-pages
+├── .github/workflows/
+│   ├── ci.yml                   # тесты + smoke-сборка на фикстуре (без реального GEDCOM)
+│   └── pages.yml                # публикация allowlist-файлов в gh-pages
 ├── .nojekyll                    # отключает Jekyll на Pages
 ├── LICENSE                      # MIT для кода
-└── requirements.txt             # рантайм-зависимости сборщика (PyYAML)
+├── requirements.txt             # рантайм-зависимости сборщика (PyYAML)
+└── requirements-dev.txt         # для разработки: pytest, numpy, Pillow
 ```
 
 ---
@@ -83,6 +88,15 @@ python3 -m http.server 8080
 ```
 
 Архивные поколения добавляются в `scripts/parse_gedcom.py`, поэтому замена GEDCOM не удаляет их автоматически.
+
+### Разработка и тесты
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 -m pytest tests/ -q
+```
+
+CI (`ci.yml`) гоняет те же тесты и smoke-сборку на синтетической фикстуре при каждом push/PR в `master`; реальный GEDCOM в Actions не попадает (см. [docs/decisions.md](docs/decisions.md)).
 
 ### Редактирование текстов
 
