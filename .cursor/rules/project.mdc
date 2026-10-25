@@ -10,4 +10,4 @@ alwaysApply: true
 - After changing `scripts/`, `content/`, or `assets/site.css`, run `python3 scripts/build_site.py` and commit the updated `index.html` when publishing.
 - Publish to Pages only via allowlist: `index.html`, `.nojekyll`, `assets/hero-bg*.{avif,webp,jpg}` — never master PNGs or YAML/scripts.
 - Prefer editing `content/content.yaml` for copy; keep genealogy facts in GEDCOM + `parse_gedcom.py` injection.
-- For context in new chats, use `@assets/project-anchor.md` and `@docs/decisions.md`.
+- For context in new chats, use `@assets/project-anchor.md`; ADRs are kept locally and are not published.

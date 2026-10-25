@@ -9,7 +9,7 @@
 Подробнее:
 
 - [docs/architecture.md](docs/architecture.md) — слои данных, схема сборки, privacy-by-design, публикация в Pages;
-- [docs/decisions.md](docs/decisions.md) — краткие ADR: hero и ассеты, данные и сборка, публикация, лицензирование.
+- ADR (архитектурные решения) ведутся локально и в публичный репозиторий не входят.
 
 ---
 
@@ -59,8 +59,7 @@
 │   ├── Image 1.png / Image 2.png  # мастер фона hero и референс раскладки (в Pages не публикуются)
 │   └── hero-bg*.{avif,webp,jpg} # производные фона — входят в allowlist публикации
 ├── docs/
-│   ├── architecture.md          # архитектура и инженерные решения
-│   └── decisions.md             # ADR, кратко
+│   └── architecture.md          # архитектура и инженерные решения
 ├── index.html                   # собранный сайт (коммитится после локальной сборки)
 ├── .github/workflows/
 │   ├── ci.yml                   # тесты + smoke-сборка на фикстуре (без реальных данных)
@@ -97,7 +96,7 @@ python3 -m pip install -r requirements-dev.txt
 python3 -m pytest tests/ -q
 ```
 
-CI (`ci.yml`) гоняет те же тесты и smoke-сборку на синтетической фикстуре при каждом push/PR в `master`; реальные данные в Actions не попадают (см. [docs/decisions.md](docs/decisions.md)).
+CI (`ci.yml`) гоняет те же тесты и smoke-сборку на синтетической фикстуре при каждом push/PR в `master`; реальные данные в Actions не попадают (подробнее — ADR «CI-сборка на фикстуре», ведутся локально).
 
 ### Редактирование текстов
 

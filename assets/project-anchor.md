@@ -1,7 +1,7 @@
 # Якорь контекста проекта
 
 Короткий стартовый контекст для нового чата Cursor.  
-Подробности: [README](../README.md), [docs/architecture.md](../docs/architecture.md), [docs/decisions.md](../docs/decisions.md).
+Подробности: [README](../README.md), [docs/architecture.md](../docs/architecture.md). ADR ведутся локально и в публичный репозиторий не входят.
 
 ## Готово на `master`
 
