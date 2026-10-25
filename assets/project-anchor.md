@@ -10,7 +10,7 @@
 - **README** — короткий обзор; глубина — в `docs/architecture.md`
 - **Hero:** фон = `assets/Image 1.png`; раскладка = `assets/Image 2.png`
 - **Pages allowlist:** `index.html`, `.nojekyll`, `assets/hero-bg*.{avif,webp,jpg}`
-- **Сборка:** локально `python3 scripts/build_site.py` (GEDCOM не в CI, файл `data/skiba.ged` не в Git)
+- **Сборка:** локально `python3 scripts/build_site.py` (CI — на синтетической фикстуре, реальные данные в Git не попадают)
 
 ## Как использовать в новом чате
 

@@ -375,7 +375,7 @@ def validate_content(content: Any) -> None:
         "sources.provenance",
         [
             "title",
-            "gedcom_item",
+            "data_item",
             "copy_item",
             "birth_intro_prefix",
             "birth_intro_middle",
@@ -393,7 +393,7 @@ def validate_content(content: Any) -> None:
     require_keys(
         missing,
         "sources.missing",
-        ["title", "intro", "smart_match_suffix", "smart_match_caveat", "no_archives"],
+        ["title", "intro", "match_suffix", "match_caveat", "no_archives"],
     )
 
     legend = require_mapping(sources["legend"], "sources.legend")
@@ -633,9 +633,9 @@ def render_connectors(node: TreeNode, max_gen: int) -> list[str]:
 def render_badge(x: float, cy: float, status: str, labels: dict[str, str]) -> str:
     """Status pill in the lower-left corner of a tree card.
 
-    «ok» (есть запись в базе) не отрисовывается: наличие записи в выгрузке
-    MyHeritage — дефолтное состояние, а не статус, и слово «Подтверждено»
-    ложно намекало на документальное подтверждение."""
+    «ok» (есть запись в базе) не отрисовывается: запись в базе — дефолтное
+    состояние, а не статус, и слово «Подтверждено» ложно намекало на
+    документальное подтверждение."""
     if status == "ok":
         return ""
     width = STATUS_BADGE_W[status]
@@ -2053,7 +2053,7 @@ def render_sources_section(sources: dict[str, Any], st: dict[str, Any]) -> str:
       <div class="scard">
         <h3>{esc(provenance["title"])}</h3>
         <ul>
-          <li>{rich(provenance["gedcom_item"])}</li>
+          <li>{rich(provenance["data_item"])}</li>
           <li>{rich(provenance["copy_item"])}</li>
         </ul>
         <p style="margin:10px 0">{esc(provenance["birth_intro_prefix"])} {counted(st['people'], ('человека', 'человек', 'человек'))} {esc(provenance["birth_intro_middle"])} {st['with_birth']}. {esc(provenance["birth_intro_suffix"])}</p>
@@ -2068,8 +2068,8 @@ def render_sources_section(sources: dict[str, Any], st: dict[str, Any]) -> str:
         <h3>{esc(missing["title"])}</h3>
         <p style="margin-bottom:10px">{rich(missing["intro"])}</p>
         <ul>
-          <li><b>{counted(st['matched'], ('запись', 'записи', 'записей'))}</b> {esc(missing["smart_match_suffix"])}</li>
-          <li>{rich(missing["smart_match_caveat"])}</li>
+          <li><b>{counted(st['matched'], ('запись', 'записи', 'записей'))}</b> {esc(missing["match_suffix"])}</li>
+          <li>{rich(missing["match_caveat"])}</li>
           <li>{esc(missing["no_archives"])}</li>
         </ul>
       </div>

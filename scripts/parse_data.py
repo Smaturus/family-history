@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Load data/family.yaml and expose the same Person/Family model that the
-former GEDCOM parser provided, so render_* functions in build_site.py are
-unaffected.
+"""Load data/family.yaml and expose the Person/Family model used by the
+render_* functions in build_site.py.
 
-The YAML file is the native data source now (see docs/decisions.md, ADR
-«Отказ от GEDCOM в пользу YAML»): it stays LOCAL — .gitignore excludes it,
-because it holds names and birth years of living people. The privacy fuse
+The YAML file is the native data source: it stays LOCAL — .gitignore excludes
+it, because it holds names and birth years of living people. The privacy fuse
 below rejects anything more detailed if it is ever added by hand.
 """
 
@@ -23,7 +21,7 @@ import yaml
 
 
 # People born more than this many years ago are treated as deceased when no
-# death date is recorded (same rule as the former GEDCOM pipeline).
+# death date is recorded (same rule as the former import pipeline).
 PRESUMED_DECEASED_AGE = 110
 
 ALLOWED_STATUS = {"ok", "hyp"}
@@ -34,7 +32,7 @@ def fail(message: str) -> None:
     sys.exit(f"Ошибка данных: {message}\nПроверьте data/family.yaml и запустите сборку снова.")
 
 
-# GEDCOM exports the same locality under different spellings; show one full label.
+# External exports spell the same locality differently; show one full label.
 # Kept so that place strings already stored in family.yaml render unchanged.
 PLACE_CANONICAL = {
   # Мокрое
@@ -246,7 +244,7 @@ class Person:
 
     @property
     def has_match(self) -> bool:
-        """MyHeritage Smart Match with another user tree — a lead, not evidence."""
+        """A match with another researcher's tree — a lead, not evidence."""
         return bool(self.sources)
 
     @property
@@ -415,8 +413,8 @@ def stats(
                 result[key] = database[key]
         if "earliest_birth" in database:
             result["earliest_year"] = database["earliest_birth"]
-        if "smart_matches" in database:
-            result["matched"] = database["smart_matches"]
+        if "matches" in database:
+            result["matched"] = database["matches"]
         if "deaths" in database:
             result["with_death"] = database["deaths"]
         if "surnames_total" in database:
@@ -549,7 +547,7 @@ def load_family(path: Path) -> tuple[dict[str, Person], dict[str, Family], dict[
         people[person.id] = person
         raw_by_id[person.id] = raw
 
-    # Parent links from the chart become families, the way GEDCOM stored them:
+    # Parent links from the chart become families, the way the former export stored them:
     # children sharing the same (father, mother) pair share one famc family.
     families: dict[str, Family] = {}
     pair_of: dict[str, tuple[str, str]] = {}

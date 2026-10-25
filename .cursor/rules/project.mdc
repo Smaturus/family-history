@@ -5,9 +5,9 @@ alwaysApply: true
 
 # Project rules (minimal)
 
-- Do not commit `data/skiba.ged` or other raw GEDCOM with living-person data.
+- Never commit `data/`: it holds names and birth years of living people.
 - Do not recolor, redesign, or replace `assets/Image 1.png` (hero master). Use Image 2 only as layout reference.
 - After changing `scripts/`, `content/`, or `assets/site.css`, run `python3 scripts/build_site.py` and commit the updated `index.html` when publishing.
 - Publish to Pages only via allowlist: `index.html`, `.nojekyll`, `assets/hero-bg*.{avif,webp,jpg}` — never master PNGs or YAML/scripts.
-- Prefer editing `content/content.yaml` for copy; keep genealogy facts in GEDCOM + `parse_gedcom.py` injection.
+- Prefer editing `content/content.yaml` for copy; keep genealogy facts in `data/family.yaml` (loaded by `scripts/parse_data.py`).
 - For context in new chats, use `@assets/project-anchor.md`; ADRs are kept locally and are not published.

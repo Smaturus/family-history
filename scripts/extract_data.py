@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Extract family data from the generated index.html into data/family.yaml.
 
-The original GEDCOM export (data/skiba.ged) is lost; the published index.html
+The original export of the former base is lost; the published index.html
 is the only remaining source. Everything that is mechanically verifiable in
 the HTML is transferred into a local YAML file (never committed — it holds
 names and birth years of living people; see docs/decisions.md):
@@ -43,7 +43,7 @@ MID_X = {x + BOX_W + 14 for x in COLUMN_X[:-1]}
 # Archival persons of the 1834 revision list (yard No. 26, sheet 689, frame
 # 0168). They are named in the «Матюхины» branch text but have no chart card.
 # Birth/death years are computed from the ages stated in the text — the same
-# computation the old GEDCOM injection performed. «Григорий» и «Степанида» —
+# computation the old injection performed. «Григорий» и «Степанида» —
 # родители по ревизии, они уже есть в древе.
 ARCHIVAL_PERSONS = [
     {
@@ -239,7 +239,7 @@ def parse_database(html: str) -> dict:
     ]
     return {
         "note": (
-            "Агрегаты утерянного экспорта MyHeritage SKIBA от 17 июля 2026 "
+            "Агрегаты утерянной выгрузки от 17 июля 2026 "
             "(243 человека), публикуемые на сайте как есть: перечислить все "
             "243 персоны по index.html невозможно."
         ),
@@ -254,7 +254,7 @@ def parse_database(html: str) -> dict:
         "birth_month_year": number(r"месяц и год — (\d+)</li>", "месяц и год"),
         "birth_qualified": number(r"«между»</b> — (\d+):", "с пометой"),
         "birth_missing": number(r"<b>Дата рождения отсутствует</b> — (\d+) человек", "без даты"),
-        "smart_matches": number(r"<b>(\d+) запис(?:ь|и|ей)</b> связаны со Smart Match", "Smart Match"),
+        "matches": number(r"<b>(\d+) запис(?:ь|и|ей)</b> связаны с совпадением", "совпадения с чужими деревьями"),
         "with_parents": number(r"<b>(177)</b><span>", "с указанными родителями"),
         "top_surnames": [{"name": n, "count": c} for n, c in surnames],
         "places": [{"name": n, "count": c} for n, c in places],
@@ -458,7 +458,7 @@ def main() -> None:
             "where": "index.html, раздел «География записей» (только агрегаты).",
         },
         {
-            "what": "Персональный состав утерянной базы (243 человека, 93 семьи, 50 дат смерти, 82 Smart Match) — не восстановим; перенесён только агрегатами в database.",
+            "what": "Персональный состав утерянной базы (243 человека, 93 семьи, 50 дат смерти, 82 совпадения с чужими деревьями) — не восстановим; перенесён только агрегатами в database.",
             "where": "index.html, разделы «Источник» и «Что откуда взято».",
         },
     ]
@@ -473,7 +473,7 @@ def main() -> None:
             "source": (
                 "Извлечено механически из сгенерированного index.html скриптом "
                 "scripts/extract_data.py: карточки древа, коннекторы, таймлайн. "
-                "Исходный GEDCOM (MyHeritage SKIBA, экспорт 17 июля 2026) утерян."
+                "Исходная выгрузка (экспорт 17 июля 2026) утеряна."
             ),
             "export_date": "17 июля 2026",
             "extracted_at": date.today().isoformat(),
