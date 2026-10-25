@@ -8,3 +8,5 @@ __pycache__/
 .Python
 .venv/
 venv/
+# Локальные ADR: не публикуются в открытом репозитории.
+docs/decisions.md
