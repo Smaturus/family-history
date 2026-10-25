@@ -37,8 +37,8 @@ def build_in_tmp(tmp_path, with_data=True):
     if with_data:
         shutil.copy(FIXTURE, dst / "data" / "family.yaml")
     else:
-        # В рабочей копии data/family.yaml теперь коммитится — для негативного
-        # сценария убираем и его.
+        # В рабочей копии data/family.yaml может лежать локально — для
+        # негативного сценария убираем и его.
         (dst / "data" / "family.yaml").unlink(missing_ok=True)
     proc = subprocess.run(
         [sys.executable, "-X", "utf8", str(dst / "scripts" / "build_site.py")],
