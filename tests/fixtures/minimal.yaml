@@ -1,0 +1,93 @@
+# Синтетическая фикстура для тестов и CI: вымышленные люди, никаких реальных ПДн.
+# Структура повторяет data/family.yaml (см. docs/architecture.md):
+#   meta / root / persons / families [/ database / gaps].
+# Точные даты живых здесь не просто отсутствуют — parse_data.py отклоняет их
+# при загрузке (приватный предохранитель, тест test_living_exact_date_rejected).
+
+meta:
+  export_date: "17 июля 2026"
+  source: "Синтетическая фикстура (вымышленные люди) для тестов и CI."
+
+root: t01
+
+persons:
+  # Якорная семья: корень t01, супруга t02, ребёнок t03 — все живы.
+  - id: t01
+    surname: Тестов
+    name: Сергей Иванович
+    birth: "1971"
+    sex: M
+    deceased: false
+    status: ok
+    father: t04
+    mother: t05
+  - id: t02
+    surname: Тестова
+    name: Надежда Петровна
+    birth: "1969"
+    sex: F
+    deceased: false
+    status: ok
+    father: t08
+  - id: t03
+    surname: Тестова
+    name: Анна Сергеевна
+    birth: "2001"
+    sex: F
+    deceased: false
+    status: ok
+    father: t01
+    mother: t02
+
+  # Линия отца: полный год, гипотеза с квалификатором, предок без дат.
+  - id: t04
+    surname: Тестов
+    name: Иван Сергеевич
+    birth: "1940"
+    death: "2010"
+    sex: M
+    deceased: true
+    status: ok
+    father: t06
+  - id: t05
+    surname: Примерова
+    name: Мария Архиповна
+    birth: "1945"
+    death: "2010"
+    sex: F
+    deceased: true
+    status: ok
+  - id: t06
+    surname: Тестов
+    name: Петр Петрович
+    birth: ок. 1910
+    death: "1980"
+    sex: M
+    deceased: true
+    status: hyp
+    father: t07
+  - id: t07
+    surname: Тестов
+    name: Архип
+    sex: M
+    deceased: true
+    status: hyp
+
+  # Линия супруги: отец без года рождения, мать-заглушка в древе.
+  - id: t08
+    surname: Примеров
+    name: Петр
+    death: "1990"
+    sex: M
+    deceased: true
+    status: hyp
+
+families:
+  - husb: t01
+    wife: t02
+    chil: [t03]
+    note: "Якорная семья (скобка брака и ребёнок-якорь)."
+
+gaps:
+  - what: "Мать t08 (отца супруги) неизвестна — в древе будет заглушка «мать не найдена»."
+    where: "фикстура, persons.t08."

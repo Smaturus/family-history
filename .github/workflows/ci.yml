@@ -25,12 +25,13 @@ jobs:
       - name: Run tests
         run: python -m pytest tests/ -q
 
-      # Реальный GEDCOM с ПДн в CI не попадает (см. ADR «CI-сборка на фикстуре»):
-      # вместо data/skiba.ged используется синтетическая фикстура с вымышленными людьми.
-      - name: Prepare fixture GEDCOM
+      # Реальные данные с ПДн в CI не попадают (см. ADR «CI-сборка на фикстуре»):
+      # вместо коммитимого data/family.yaml в рабочую копию подкладывается
+      # синтетическая фикстура с вымышленными людьми.
+      - name: Prepare fixture data
         run: |
           mkdir -p data
-          cp tests/fixtures/minimal.ged data/skiba.ged
+          cp tests/fixtures/minimal.yaml data/family.yaml
 
       - name: Build site
         run: python scripts/build_site.py

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate family archive website from GEDCOM export and content/content.yaml."""
+"""Generate family archive website from data/family.yaml and content/content.yaml."""
 
 from __future__ import annotations
 
@@ -15,23 +15,21 @@ from typing import Any
 import yaml
 from collections import Counter
 
-from parse_gedcom import (
+from parse_data import (
     Family,
     Person,
-    canonical_place,
     counted,
     direct_lines,
     format_date,
     genitive_given_name,
-    parse_gedcom,
+    load_family,
     plural,
     stats,
     year_only,
 )
 
-ROOT_ID = "@I1@"
 ROOT = Path(__file__).resolve().parents[1]
-GEDCOM_PATH = ROOT / "data" / "skiba.ged"
+DATA_PATH = ROOT / "data" / "family.yaml"
 CONTENT_PATH = ROOT / "content" / "content.yaml"
 OUTPUT_PATH = ROOT / "index.html"
 CSS = ROOT / "assets" / "site.css"
@@ -782,28 +780,21 @@ class FamilyContext:
 def resolve_family_context(
     people: dict[str, Person],
     families: dict[str, Family],
+    root_id: str,
 ) -> FamilyContext:
-    """Resolve the focal family from ROOT_ID."""
-    root = people[ROOT_ID]
+    """Resolve the focal family from the root person id (family.yaml: root)."""
+    root = people[root_id]
     spouse_fam = families[root.fams[0]]
-    spouse_id = spouse_fam.wife if spouse_fam.husb == ROOT_ID else spouse_fam.husb
+    spouse_id = spouse_fam.wife if spouse_fam.husb == root_id else spouse_fam.husb
     spouse = people[spouse_id]
     children = [people[c] for c in spouse_fam.chil if c in people]
     child = children[0] if children else None
     return FamilyContext(root=root, spouse=spouse, child=child)
 
 
-def merged_places(people: dict[str, Person]) -> Counter[str]:
-    """Aggregate canonical place names from deceased persons."""
-    counts: Counter[str] = Counter()
-    for person in people.values():
-        if person.is_living:
-            continue
-        for raw_place in (person.birt_plac, person.deat_plac):
-            raw_place = raw_place.strip()
-            if raw_place and raw_place not in {"Россия", "Украина"}:
-                counts[canonical_place(raw_place)] += 1
-    return counts
+def published_places(database: dict[str, Any]) -> Counter[str]:
+    """Place counts of the lost export, published verbatim on the site."""
+    return Counter({entry["name"]: entry["count"] for entry in database.get("places", [])})
 
 
 def build_places_html(places_content: dict[str, Any], place_counts: Counter[str]) -> str:
@@ -1888,7 +1879,7 @@ def render_hero_section(
 
 <div class="facts">
   <div class="wrap">
-    <div class="label">{esc(hero["label_prefix"])} {esc(export_date)} · {esc(caption)}</div>
+    <div class="label">{esc(hero["label_prefix"])} · {esc(caption)}</div>
     <p class="facts-lead">{rich(hero["facts_line"])}</p>
     <div class="stats">
       <div><b>{documented_gens}</b><span>{plural(documented_gens, ('поколение', 'поколения', 'поколений'))} {esc(hero["stats"]["generations"])}</span></div>
@@ -2156,9 +2147,16 @@ def render_tree_page(
     goals: list[tuple[Person, int]],
     pedigree_svg: str,
     goals_html: str,
+    with_parents: int | None = None,
 ) -> str:
     """Second page: SVG pedigree chart and search goals."""
     goals_text = tree["goals"]
+    # The published count of people with recorded parents belongs to the lost
+    # full database (family.yaml: database.with_parents); fall back to the
+    # chart persons when the override is absent.
+    parents_count = with_parents if with_parents is not None else len(
+        [p for p in people.values() if p.famc]
+    )
     return f"""<div class="page" id="page2">
 <section class="pagehead">
   <div class="wrap">
@@ -2166,7 +2164,7 @@ def render_tree_page(
     <h1>{esc(tree["h1"])}</h1>
     <p class="sub">{rich(tree["lead"])}</p>
     <div class="stats" style="margin-top:24px">
-      <div><b>{len([p for p in people.values() if p.famc])}</b><span>{esc(tree["stats"]["with_parents"])}</span></div>
+      <div><b>{parents_count}</b><span>{esc(tree["stats"]["with_parents"])}</span></div>
       <div><b>{len(goals)}</b><span>{esc(tree["stats"]["search_goals"])}</span></div>
     </div>
   </div>
@@ -2309,17 +2307,18 @@ def build_html(
     meta: dict[str, str],
     content: dict[str, Any],
 ) -> str:
-    family = resolve_family_context(people, families)
-    st = stats(people, families)
-    father_line = direct_lines(ROOT_ID, people, families)["father"]
-    mother_line = direct_lines(ROOT_ID, people, families)["mother"]
+    root_id = meta["root"]
+    family = resolve_family_context(people, families, root_id)
+    st = stats(people, families, meta.get("database"))
+    father_line = direct_lines(root_id, people, families)["father"]
+    mother_line = direct_lines(root_id, people, families)["mother"]
     skiba_father = direct_lines(family.spouse.id, people, families)["father"]
     skiba_mother = direct_lines(family.spouse.id, people, families)["mother"]
 
-    gens_father = count_generations(ROOT_ID, people, families)
+    gens_father = count_generations(root_id, people, families)
     gens_skiba = count_generations(family.spouse.id, people, families)
     documented_gens = max(gens_father, gens_skiba) + 1
-    goals = missing_parent_goals([ROOT_ID, family.spouse.id], people, families)
+    goals = missing_parent_goals([root_id, family.spouse.id], people, families)
     gen_names = generation_names(content)
 
     # Full paternal chain, same depth as the pedigree chart — down to the
@@ -2328,7 +2327,9 @@ def build_html(
     if len(timeline_people) < 4:
         timeline_people = skiba_father
 
-    places_html = build_places_html(content["places"], merged_places(people))
+    places_html = build_places_html(
+        content["places"], published_places(meta.get("database") or {})
+    )
     surnames_html = build_surnames_html(content["surnames"], st["top_surnames"])
     goals_html = build_goals_html(content["tree"], goals, gen_names)
     pedigree_svg = render_pedigree_svg(
@@ -2343,6 +2344,7 @@ def build_html(
         max_gen=7,
     )
     export_date = format_date(meta.get("date", "")) or "2026"
+    with_parents = (meta.get("database") or {}).get("with_parents")
     css = CSS.read_text(encoding="utf-8") if CSS.exists() else ""
 
     return (
@@ -2362,7 +2364,7 @@ def build_html(
             places_html,
             surnames_html,
         )
-        + render_tree_page(content["tree"], people, goals, pedigree_svg, goals_html)
+        + render_tree_page(content["tree"], people, goals, pedigree_svg, goals_html, with_parents)
         + render_footer(content["footer"], export_date)
         + render_page_script()
     )
@@ -2373,35 +2375,36 @@ def validate_inputs() -> None:
     if not CONTENT_PATH.exists():
         sys.exit(f"Ошибка: не найден {CONTENT_PATH.relative_to(ROOT)} — файл редакционных текстов обязателен для сборки.")
 
-    if not GEDCOM_PATH.exists():
+    if not DATA_PATH.exists():
         sys.exit(
-            f"Ошибка: файл GEDCOM не найден ({GEDCOM_PATH.relative_to(ROOT)}).\n"
-            "Положите экспорт MyHeritage в data/skiba.ged (файл не коммитится) и запустите сборку снова."
+            f"Ошибка: файл данных не найден ({DATA_PATH.relative_to(ROOT)}).\n"
+            "family.yaml хранится только локально и не коммитится; при необходимости "
+            "восстановите его скриптом scripts/extract_data.py из опубликованного index.html."
         )
 
-    raw = GEDCOM_PATH.read_bytes()
+    raw = DATA_PATH.read_bytes()
     if not raw.strip():
-        sys.exit(f"Ошибка: файл GEDCOM пуст ({GEDCOM_PATH.relative_to(ROOT)}).")
+        sys.exit(f"Ошибка: файл данных пуст ({DATA_PATH.relative_to(ROOT)}).")
 
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         sys.exit(
-            f"Ошибка: файл GEDCOM не в кодировке UTF-8 (байт {exc.start}).\n"
-            "Пересохраните экспорт MyHeritage в UTF-8 и запустите сборку снова."
+            f"Ошибка: {DATA_PATH.relative_to(ROOT)} не в кодировке UTF-8 (байт {exc.start}).\n"
+            "Пересохраните файл в UTF-8 и запустите сборку снова."
         )
 
-    if not re.search(r"^0 .*INDI", text, re.MULTILINE):
+    if not re.search(r"^persons:", text, re.MULTILINE):
         sys.exit(
-            f"Ошибка: в {GEDCOM_PATH.relative_to(ROOT)} нет записей INDI — файл не похож на GEDCOM-экспорт.\n"
-            "Проверьте, что это выгрузка древа (GEDCOM 5.5.1), а не другой файл."
+            f"Ошибка: в {DATA_PATH.relative_to(ROOT)} нет раздела «persons» — файл не похож "
+            "на данные семейного архива. Проверьте структуру (meta/root/persons/families)."
         )
 
 
 def main() -> None:
     validate_inputs()
     content = load_content()
-    people, families, meta = parse_gedcom(GEDCOM_PATH)
+    people, families, meta = load_family(DATA_PATH)
     html_content = build_html(people, families, meta, content)
 
     # Post-build safety validation (P0 invariant check):
