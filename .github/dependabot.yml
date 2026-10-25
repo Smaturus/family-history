@@ -1,0 +1,18 @@
+version: 2
+
+# Dependency updates for the ecosystems this project actually uses.
+# Security/version PRs run the regular CI (tests + smoke build) on pull_request.
+updates:
+  # Workflow actions (checkout, setup-python) — keep them current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
+  # Pinned build/runtime and dev requirements: PyYAML, pytest, numpy, Pillow.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 3
