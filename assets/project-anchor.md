@@ -5,8 +5,9 @@
 
 ## Готово на `master`
 
-- **Live:** https://smaturus.github.io/family-history/
-- **Репозиторий:** Smaturus/family-history
+- **Проект:** локальный самостоятельный репозиторий; публикация и remote не настроены
+- **Разделы:** «Матюхины» и «Скиба» — два представления одного `data/family.yaml`
+- **Навигация:** `#matyukhiny`, `#skiba`, `#matyukhiny-tree`, `#skiba-tree`
 - **README** — короткий обзор; глубина — в `docs/architecture.md`
 - **Hero:** фон = `assets/Image 1.png`; раскладка = `assets/Image 2.png`
 - **Pages allowlist:** `index.html`, `.nojekyll`, `assets/hero-bg*.{avif,webp,jpg}`

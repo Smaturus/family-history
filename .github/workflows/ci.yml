@@ -41,3 +41,5 @@ jobs:
           test -f index.html
           grep -q "<svg" index.html
           grep -q 'id="page2"' index.html
+          grep -q 'id="page3"' index.html
+          test "$(grep -c 'class="pedigree"' index.html)" -ge 2

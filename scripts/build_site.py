@@ -265,195 +265,154 @@ def require_str(data: Any, path: str) -> str:
 
 def validate_branch(branch: Any, path: str) -> None:
     branch = require_mapping(branch, path)
-    require_keys(branch, path, ["tag", "title", "paragraphs", "mini"])
+    require_keys(branch, path, ["tag", "title", "basis", "geography", "paragraphs"])
     require_list(branch["paragraphs"], f"{path}.paragraphs", min_len=1)
-    require_str(branch["tag"], f"{path}.tag")
-    require_str(branch["title"], f"{path}.title")
-    require_str(branch["mini"], f"{path}.mini")
+    for key in ("tag", "title", "basis", "geography"):
+        require_str(branch[key], f"{path}.{key}")
 
 
 def validate_content(content: Any) -> None:
     """Schema checks for editor-facing YAML used by the generator."""
     content = require_mapping(content, "root")
-    require_keys(
-        content,
-        "root",
-        [
-            "meta",
-            "hero",
-            "lines",
-            "alekseevs",
-            "timeline",
-            "surnames",
-            "places",
-            "meeting",
-            "sources",
-            "tree",
-            "footer",
-        ],
-    )
+    require_keys(content, "root", ["meta", "hero", "about", "archive", "sections", "tree", "footer"])
 
     meta = require_mapping(content["meta"], "meta")
-    require_keys(meta, "meta", ["title", "brand", "nav_items", "nav_tree"])
+    require_keys(meta, "meta", ["title", "brand", "nav_items"])
     nav_items = require_list(meta["nav_items"], "meta.nav_items", min_len=1)
     for index, item in enumerate(nav_items):
         path = f"meta.nav_items[{index}]"
-        require_mapping(item, path)
+        item = require_mapping(item, path)
         require_keys(item, path, ["label", "target"])
+        require_str(item["label"], f"{path}.label")
+        require_str(item["target"], f"{path}.target")
 
     hero = require_mapping(content["hero"], "hero")
-    require_keys(
-        hero,
-        "hero",
-        [
-            "label_prefix",
-            "h1",
-            "sub",
-            "cta",
-            "facts_line",
-            "privacy_note",
-            "graph_caption_prefix",
-            "stats",
-        ],
-    )
-    hero_stats = require_mapping(hero["stats"], "hero.stats")
-    require_keys(
-        hero_stats,
-        "hero.stats",
-        ["generations", "people", "surnames", "earliest_birth", "earliest_fallback"],
-    )
+    require_keys(hero, "hero", ["h1", "sub", "cta", "cta_target"])
+    for key in ("h1", "sub", "cta", "cta_target"):
+        require_str(hero[key], f"hero.{key}")
 
-    lines = require_mapping(content["lines"], "lines")
-    require_keys(lines, "lines", ["label", "title", "lead", "branches"])
-    branches = require_mapping(lines["branches"], "lines.branches")
-    for key in ("matyukhin_father", "astafyev_mother", "skiba_father", "potashkin_mother"):
-        validate_branch(branches.get(key), f"lines.branches.{key}")
+    about = require_mapping(content["about"], "about")
+    require_keys(about, "about", ["label", "text"])
+    require_str(about["label"], "about.label")
+    require_str(about["text"], "about.text")
 
-    alekseevs = require_mapping(content["alekseevs"], "alekseevs")
-    require_keys(alekseevs, "alekseevs", ["label", "title", "lead", "tatar", "donbass"])
-    validate_branch(alekseevs["tatar"], "alekseevs.tatar")
-    validate_branch(alekseevs["donbass"], "alekseevs.donbass")
+    archive = require_mapping(content["archive"], "archive")
+    require_keys(archive, "archive", ["label", "title", "entry_link", "tree_link"])
+    for key in ("label", "title", "entry_link", "tree_link"):
+        require_str(archive[key], f"archive.{key}")
 
-    timeline = require_mapping(content["timeline"], "timeline")
-    require_keys(
-        timeline,
-        "timeline",
-        ["label", "title", "lead", "generation_prefix", "generation_suffix", "place_fallback"],
-    )
+    sections = require_mapping(content["sections"], "sections")
+    require_keys(sections, "sections", ["matyukhiny", "skiba"])
+    expected_branches = {
+        "matyukhiny": ("matyukhin_father", "astafyev_mother"),
+        "skiba": ("skiba_father", "potashkin_mother"),
+    }
+    for section_key in ("matyukhiny", "skiba"):
+        path = f"sections.{section_key}"
+        section = require_mapping(sections[section_key], path)
+        require_keys(
+            section,
+            path,
+            [
+                "title", "root", "page_id", "tree_page_id", "entry", "lead",
+                "tree_title", "tree_lead", "branches_label", "branches_title",
+                "branches", "sources", "places", "chronicle", "gallery",
+            ],
+        )
+        for key in (
+            "title", "root", "page_id", "tree_page_id", "entry", "lead",
+            "tree_title", "tree_lead", "branches_label", "branches_title",
+        ):
+            require_str(section[key], f"{path}.{key}")
+        branches = require_mapping(section["branches"], f"{path}.branches")
+        for branch_key in expected_branches[section_key]:
+            validate_branch(branches.get(branch_key), f"{path}.branches.{branch_key}")
 
-    surnames = require_mapping(content["surnames"], "surnames")
-    require_keys(surnames, "surnames", ["label", "title", "lead", "count_suffix", "default_note", "notes"])
-    require_mapping(surnames["notes"], "surnames.notes")
+        if "collateral" in section:
+            collateral = require_mapping(section["collateral"], f"{path}.collateral")
+            require_keys(collateral, f"{path}.collateral", ["label", "title", "lead", "items"])
+            require_str(collateral["label"], f"{path}.collateral.label")
+            require_str(collateral["title"], f"{path}.collateral.title")
+            require_str(collateral["lead"], f"{path}.collateral.lead")
+            items = require_list(collateral["items"], f"{path}.collateral.items", min_len=2)
+            for index, item in enumerate(items):
+                validate_branch(item, f"{path}.collateral.items[{index}]")
 
-    places = require_mapping(content["places"], "places")
-    require_keys(
-        places,
-        "places",
-        ["label", "title", "lead", "card_tag_prefix", "default_note", "notes"],
-    )
-    require_mapping(places["notes"], "places.notes")
+        sources = require_mapping(section["sources"], f"{path}.sources")
+        require_keys(sources, f"{path}.sources", ["label", "title", "items", "archives_title", "archives"])
+        require_str(sources["label"], f"{path}.sources.label")
+        require_str(sources["title"], f"{path}.sources.title")
+        require_str(sources["archives_title"], f"{path}.sources.archives_title")
+        items = require_list(sources["items"], f"{path}.sources.items", min_len=1)
+        for index, item in enumerate(items):
+            item_path = f"{path}.sources.items[{index}]"
+            item = require_mapping(item, item_path)
+            require_keys(item, item_path, ["kind", "title"])
+            require_str(item["kind"], f"{item_path}.kind")
+            require_str(item["title"], f"{item_path}.title")
+            for optional in ("date", "reference"):
+                if optional in item:
+                    require_str(item[optional], f"{item_path}.{optional}")
+            if "paragraphs" in item:
+                require_list(item["paragraphs"], f"{item_path}.paragraphs")
+            if "image" in item:
+                image = require_mapping(item["image"], f"{item_path}.image")
+                require_keys(image, f"{item_path}.image", ["src", "alt"])
+        require_list(sources["archives"], f"{path}.sources.archives")
 
-    meeting = require_mapping(content["meeting"], "meeting")
-    require_keys(
-        meeting,
-        "meeting",
-        ["label", "title", "lead_prefix", "lead_suffix", "child_fallback", "living", "source"],
-    )
-    require_keys(require_mapping(meeting["living"], "meeting.living"), "meeting.living", ["tag", "title", "body"])
-    require_keys(
-        require_mapping(meeting["source"], "meeting.source"),
-        "meeting.source",
-        ["tag", "title", "intro_prefix", "intro_suffix"],
-    )
+        places = require_mapping(section["places"], f"{path}.places")
+        require_keys(places, f"{path}.places", ["label", "title", "items"])
+        require_str(places["label"], f"{path}.places.label")
+        require_str(places["title"], f"{path}.places.title")
+        items = require_list(places["items"], f"{path}.places.items", min_len=1)
+        for index, item in enumerate(items):
+            item_path = f"{path}.places.items[{index}]"
+            item = require_mapping(item, item_path)
+            require_keys(item, item_path, ["name", "note"])
+            require_str(item["name"], f"{item_path}.name")
+            require_str(item["note"], f"{item_path}.note")
 
-    sources = require_mapping(content["sources"], "sources")
-    require_keys(sources, "sources", ["label", "title", "lead", "provenance", "missing", "legend", "archives"])
+        chronicle = require_mapping(section["chronicle"], f"{path}.chronicle")
+        require_keys(chronicle, f"{path}.chronicle", ["label", "title", "events"])
+        require_str(chronicle["label"], f"{path}.chronicle.label")
+        require_str(chronicle["title"], f"{path}.chronicle.title")
+        events = require_list(chronicle["events"], f"{path}.chronicle.events", min_len=1)
+        for index, event in enumerate(events):
+            event_path = f"{path}.chronicle.events[{index}]"
+            event = require_mapping(event, event_path)
+            require_keys(event, event_path, ["date", "title"])
+            require_str(event["date"], f"{event_path}.date")
+            require_str(event["title"], f"{event_path}.title")
+            if "place" in event:
+                require_str(event["place"], f"{event_path}.place")
 
-    provenance = require_mapping(sources["provenance"], "sources.provenance")
-    require_keys(
-        provenance,
-        "sources.provenance",
-        [
-            "title",
-            "data_item",
-            "copy_item",
-            "birth_intro_prefix",
-            "birth_intro_middle",
-            "birth_intro_suffix",
-            "birth_buckets",
-        ],
-    )
-    require_keys(
-        require_mapping(provenance["birth_buckets"], "sources.provenance.birth_buckets"),
-        "sources.provenance.birth_buckets",
-        ["full", "year_only", "month_year", "qualified", "qualified_note", "missing"],
-    )
-
-    missing = require_mapping(sources["missing"], "sources.missing")
-    require_keys(
-        missing,
-        "sources.missing",
-        ["title", "intro", "match_suffix", "match_caveat", "no_archives"],
-    )
-
-    legend = require_mapping(sources["legend"], "sources.legend")
-    require_keys(legend, "sources.legend", ["title", "hypothesis", "calculated_dates", "dashed_card"])
-
-    archives = require_mapping(sources["archives"], "sources.archives")
-    require_keys(
-        archives,
-        "sources.archives",
-        ["title", "mokroe", "valday", "chistopol", "slavyanoserbsk", "khimki"],
-    )
+        gallery = require_mapping(section["gallery"], f"{path}.gallery")
+        require_keys(gallery, f"{path}.gallery", ["title", "photos"])
+        require_str(gallery["title"], f"{path}.gallery.title")
+        photos = require_list(gallery["photos"], f"{path}.gallery.photos")
+        for index, photo in enumerate(photos):
+            photo_path = f"{path}.gallery.photos[{index}]"
+            photo = require_mapping(photo, photo_path)
+            require_keys(photo, photo_path, ["src", "alt"])
+            require_str(photo["src"], f"{photo_path}.src")
+            require_str(photo["alt"], f"{photo_path}.alt")
 
     tree = require_mapping(content["tree"], "tree")
     require_keys(
         tree,
         "tree",
-        [
-            "label",
-            "h1",
-            "lead",
-            "stats",
-            "column_titles",
-            "status",
-            "missing_father",
-            "missing_mother",
-            "legend",
-            "goals",
-            "generation_names",
-            "generation_fallback_suffix",
-        ],
+        ["label", "h1", "column_titles", "status", "missing_father", "missing_mother", "legend"],
     )
-    require_keys(require_mapping(tree["stats"], "tree.stats"), "tree.stats", ["with_parents", "search_goals"])
     require_list(tree["column_titles"], "tree.column_titles", min_len=6)
     require_keys(require_mapping(tree["status"], "tree.status"), "tree.status", ["ok", "hyp", "q"])
-    require_keys(
-        require_mapping(tree["legend"], "tree.legend"),
-        "tree.legend",
-        ["ok", "hyp", "q", "anchor"],
-    )
-    goals = require_mapping(tree["goals"], "tree.goals")
-    require_keys(
-        goals,
-        "tree.goals",
-        [
-            "label",
-            "title",
-            "lead",
-            "title_prefix",
-            "line_suffix",
-            "hint_known_place_prefix",
-            "hint_known_place_suffix",
-            "hint_unknown_place",
-            "status_suffix",
-        ],
-    )
-    require_mapping(tree["generation_names"], "tree.generation_names")
-    require_str(tree["generation_fallback_suffix"], "tree.generation_fallback_suffix")
+    require_keys(require_mapping(tree["legend"], "tree.legend"), "tree.legend", ["ok", "hyp", "q", "anchor"])
+    require_str(tree["missing_father"], "tree.missing_father")
+    require_str(tree["missing_mother"], "tree.missing_mother")
 
     footer = require_mapping(content["footer"], "footer")
-    require_keys(footer, "footer", ["brand", "middle", "suffix"])
+    require_keys(footer, "footer", ["brand", "privacy_note"])
+    require_str(footer["brand"], "footer.brand")
+    require_str(footer["privacy_note"], "footer.privacy_note")
 
 
 def esc(text: str) -> str:
@@ -697,12 +656,21 @@ def render_pedigree_svg(
     families: dict[str, Family],
     content: dict[str, Any],
     max_gen: int = 4,
+    include_spouse_ancestors: bool = True,
+    id_prefix: str = "pedigree",
+    description: str = "",
 ) -> str:
-    """Two stacked ancestor charts: the husband's line above, the wife's below."""
+    """A selected ancestor chart with the spouse and shared child as anchors."""
     labels = status_labels(content)
     titles = column_titles(content)
     father_tree = build_ancestor_tree(root.id, people, families, content, max_gen)
-    mother_tree = build_ancestor_tree(spouse.id, people, families, content, max_gen)
+    mother_tree = build_ancestor_tree(
+        spouse.id,
+        people,
+        families,
+        content,
+        max_gen if include_spouse_ancestors else 0,
+    )
 
     cursor = [TOP_PAD + BOX_H / 2]
     assign_positions(father_tree, cursor)
@@ -741,30 +709,28 @@ def render_pedigree_svg(
     return (
         f'<svg class="pedigree" viewBox="0 0 {width} {height:.0f}" '
         f'xmlns="http://www.w3.org/2000/svg" style="min-width:{width}px" '
-        f'role="img" aria-labelledby="pedigree-title pedigree-desc">'
-        f'<title id="pedigree-title">{esc(content["tree"]["h1"])}</title>'
-        f'<desc id="pedigree-desc">{esc(content["tree"]["lead"])}</desc>'
+        f'role="img" aria-labelledby="{id_prefix}-title {id_prefix}-desc">'
+        f'<title id="{id_prefix}-title">{esc(content["tree"]["h1"])}</title>'
+        f'<desc id="{id_prefix}-desc">{esc(description or content["tree"]["h1"])}</desc>'
         + "".join(parts)
         + "</svg>"
     )
 
 
-def line_branch_card(branch: dict[str, Any], chain: str) -> str:
+def branch_card(
+    branch: dict[str, Any],
+    tree_href: str = "",
+    link_label: str = "",
+) -> str:
     body = paragraphs_html(branch["paragraphs"])
+    link = ""
+    if tree_href:
+        link = f'<a class="branch-link" href="{esc(tree_href)}">{esc(link_label)}</a>'
     return (
-        f'<div class="card"><div class="tag">{esc(branch["tag"])}</div>'
+        f'<article class="card"><div class="tag">{esc(branch["tag"])}</div>'
         f'<h3>{esc(branch["title"])}</h3>'
-        f'<p>{chain}</p>{body}'
-        f'<div class="mini">{esc(branch["mini"])}</div></div>\n      '
-    )
-
-
-def alekseev_card(branch: dict[str, Any]) -> str:
-    body = paragraphs_html(branch["paragraphs"])
-    return (
-        f'<div class="card"><div class="tag">{esc(branch["tag"])}</div>'
-        f'<h3>{esc(branch["title"])}</h3>{body}'
-        f'<div class="mini">{esc(branch["mini"])}</div></div>'
+        f'<div class="basis">{esc(branch["basis"])}</div>{body}'
+        f'<div class="geography">{esc(branch["geography"])}</div>{link}</article>'
     )
 
 
@@ -1779,6 +1745,16 @@ def child_line_text(child: Person | None, meeting: dict[str, Any]) -> str:
     return meeting["child_fallback"]
 
 
+def family_anchor_text(family: FamilyContext) -> str:
+    text = (
+        f"Семья: {family.root.short} ({family.root.public_years}) и "
+        f"{family.spouse.short} ({family.spouse.public_years})"
+    )
+    if family.child:
+        text += f"; общий ребёнок {family.child.short} ({family.child.public_years})"
+    return text + "."
+
+
 def render_document_start(meta_content: dict[str, Any], css: str) -> str:
     """HTML document preamble through opening body tag."""
     return f"""<!DOCTYPE html>
@@ -1799,20 +1775,16 @@ def render_document_start(meta_content: dict[str, Any], css: str) -> str:
 
 
 def render_nav(meta_content: dict[str, Any]) -> str:
-    """Top navigation: seven mock header items (Image 2), including Древо."""
+    """Top-level links to the project note and the two family sections."""
     items = []
     for index, item in enumerate(meta_content["nav_items"]):
         active = " active" if index == 0 else ""
         nid = f' id="nb{index + 1}"' if index == 0 else ""
         aria = ' aria-current="true"' if index == 0 else ""
         items.append(
-            f'<button class="navbtn{active}"{nid}{aria} type="button" '
-            f'data-nav="{esc(item["target"])}">{esc(item["label"])}</button>'
+            f'<a class="navbtn{active}"{nid}{aria} href="#{esc(item["target"])}" '
+            f'data-section="{esc(item["target"])}">{esc(item["label"])}</a>'
         )
-    items.append(
-        f'<button class="navbtn nav-tree" id="nb-tree" type="button" data-nav="tree">'
-        f'{esc(meta_content["nav_tree"])}</button>'
-    )
     return f"""<nav>
   <div class="wrap">
     <div class="nav-links">{"".join(items)}</div>
@@ -1847,17 +1819,8 @@ def render_hero_year_labels() -> str:
     return f'<div class="hero-years" aria-hidden="true">{"".join(parts)}</div>'
 
 
-def render_hero_section(
-    hero: dict[str, Any],
-    st: dict[str, Any],
-    documented_gens: int,
-    export_date: str,
-    father_line: list[Person],
-) -> str:
-    """Dark hero: title, subtitle and CTA over the master artwork (Image 1).
-    Date labels follow the approved layout (Image 2) without redesigning the art."""
-    years = hero_graph_years(father_line)
-    caption = hero_graph_caption(hero, years)
+def render_hero_section(hero: dict[str, Any]) -> str:
+    """Approved hero artwork, typography and year labels, without public statistics."""
     year_labels = render_hero_year_labels()
     return f"""<header class="hero" id="top">
   <div class="hero-art" aria-hidden="true">
@@ -1872,24 +1835,10 @@ def render_hero_section(
     <div class="hero-copy">
       <h1>{esc(hero["h1"])}</h1>
       <p class="sub">{rich(hero["sub"])}</p>
-      <button class="cta-link" type="button" data-nav="tree">{esc(hero["cta"])}</button>
+      <a class="cta-link" href="#{esc(hero["cta_target"])}">{esc(hero["cta"])}</a>
     </div>
   </div>
 </header>
-
-<div class="facts">
-  <div class="wrap">
-    <div class="label">{esc(hero["label_prefix"])} · {esc(caption)}</div>
-    <p class="facts-lead">{rich(hero["facts_line"])}</p>
-    <div class="stats">
-      <div><b>{documented_gens}</b><span>{plural(documented_gens, ('поколение', 'поколения', 'поколений'))} {esc(hero["stats"]["generations"])}</span></div>
-      <div><b>{st['people']}</b><span>{plural(st['people'], ('человек', 'человека', 'человек'))} {esc(hero["stats"]["people"])}</span></div>
-      <div><b>{st['surnames']}</b><span>{esc(hero["stats"]["surnames"])}</span></div>
-      <div><b>{st['earliest_year'] or esc(hero["stats"]["earliest_fallback"])}</b><span>{esc(hero["stats"]["earliest_birth"])}</span></div>
-    </div>
-    <p class="facts-note">{rich(hero["privacy_note"])}</p>
-  </div>
-</div>
 
 """
 
@@ -2097,79 +2046,236 @@ def render_sources_section(sources: dict[str, Any], st: dict[str, Any]) -> str:
 """
 
 
-def render_chronicle_page(
-    content: dict[str, Any],
-    st: dict[str, Any],
-    family: FamilyContext,
-    father_line: list[Person],
-    mother_line: list[Person],
-    skiba_father: list[Person],
-    skiba_mother: list[Person],
-    documented_gens: int,
-    export_date: str,
-    timeline_people: list[Person],
-    places_html: str,
-    surnames_html: str,
-) -> str:
-    """First page: chronicle sections from hero through sources."""
-    child_suffix = child_line_text(family.child, content["meeting"])
-    timeline_html = build_timeline_html(content["timeline"], timeline_people, family.root.id)
+def render_home_page(content: dict[str, Any]) -> str:
+    """Approved hero, compact project note and two equal archive entrances."""
+    about = content["about"]
+    archive = content["archive"]
+    entries = "".join(
+        f'<a class="card family-entry" href="#{esc(key)}">'
+        f'<div class="tag">Семейный раздел</div><h3>{esc(section["title"])}</h3>'
+        f'<p>{esc(section["entry"])}</p>'
+        f'<span class="entry-link">{esc(archive["entry_link"])}</span></a>'
+        for key, section in content["sections"].items()
+    )
     return (
         '<div class="page visible" id="page1">\n'
-        + render_hero_section(content["hero"], st, documented_gens, export_date, timeline_people)
-        + render_lines_section(
-            content["lines"],
-            father_line,
-            mother_line,
-            skiba_father,
-            skiba_mother,
-        )
-        + render_alekseevs_section(content["alekseevs"])
-        + render_timeline_section(content["timeline"], timeline_html)
-        + render_surnames_section(content["surnames"], surnames_html)
-        + render_places_section(content["places"], places_html)
-        + render_meeting_section(
-            content["meeting"],
-            family.root,
-            family.spouse,
-            child_suffix,
-            export_date,
-            st,
-        )
-        + render_sources_section(content["sources"], st)
-        + "</div>\n\n"
-    )
-
-
-def render_tree_page(
-    tree: dict[str, Any],
-    people: dict[str, Person],
-    goals: list[tuple[Person, int]],
-    pedigree_svg: str,
-    goals_html: str,
-    with_parents: int | None = None,
-) -> str:
-    """Second page: SVG pedigree chart and search goals."""
-    goals_text = tree["goals"]
-    # The published count of people with recorded parents belongs to the lost
-    # full database (family.yaml: database.with_parents); fall back to the
-    # chart persons when the override is absent.
-    parents_count = with_parents if with_parents is not None else len(
-        [p for p in people.values() if p.famc]
-    )
-    return f"""<div class="page" id="page2">
-<section class="pagehead">
+        + render_hero_section(content["hero"])
+        + f"""<section class="about" id="about">
   <div class="wrap">
-    <div class="label">{esc(tree["label"])}</div>
-    <h1>{esc(tree["h1"])}</h1>
-    <p class="sub">{rich(tree["lead"])}</p>
-    <div class="stats" style="margin-top:24px">
-      <div><b>{parents_count}</b><span>{esc(tree["stats"]["with_parents"])}</span></div>
-      <div><b>{len(goals)}</b><span>{esc(tree["stats"]["search_goals"])}</span></div>
-    </div>
+    <div class="label">{esc(about["label"])}</div>
+    <p class="about-text">{rich(about["text"])}</p>
   </div>
 </section>
 
+<section id="archive">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="label">{esc(archive["label"])}</div>
+      <h2>{esc(archive["title"])}</h2>
+      <div class="hr"></div>
+    </div>
+    <div class="grid g2">{entries}</div>
+  </div>
+</section>
+</div>
+
+"""
+    )
+
+
+def render_section_nav(section_key: str, section: dict[str, Any]) -> str:
+    """Consistent navigation within a family section and its tree."""
+    links = [
+        (f"#{section_key}", "Обзор"),
+        (f"#{section_key}-branches", "Ветви"),
+        (f"#{section_key}-tree", "Древо"),
+        (f"#{section_key}-sources", section["sources"]["label"]),
+        (f"#{section_key}-places", section["places"]["label"]),
+        (f"#{section_key}-timeline", section["chronicle"]["label"]),
+    ]
+    if section["gallery"]["photos"]:
+        links.append((f"#{section_key}-gallery", section["gallery"]["title"]))
+    items = "".join(f'<a href="{esc(target)}">{esc(label)}</a>' for target, label in links)
+    return f'<div class="section-nav"><div class="wrap">{items}</div></div>\n'
+
+
+def render_family_sources(section_key: str, sources: dict[str, Any]) -> str:
+    documents = []
+    for item in sources["items"]:
+        meta = " · ".join(esc(value) for value in (item["kind"], item.get("date", "")) if value)
+        reference = ""
+        if item.get("reference"):
+            reference = f'<div class="reference">{esc(item["reference"])}</div>'
+        image = ""
+        if item.get("image"):
+            image = (
+                f'<img src="{esc(item["image"]["src"])}" alt="{esc(item["image"]["alt"])}" '
+                'loading="lazy">'
+            )
+        documents.append(
+            f'<article class="document"><div class="kind">{meta}</div>'
+            f'<h3>{esc(item["title"])}</h3>{reference}'
+            f'{paragraphs_html(item.get("paragraphs", []))}{image}</article>'
+        )
+    archives = "".join(f"<li>{rich(item)}</li>" for item in sources["archives"])
+    archive_block = ""
+    if archives:
+        archive_block = (
+            f'<div class="archive-directions"><h3>{esc(sources["archives_title"])}</h3>'
+            f'<ul>{archives}</ul></div>'
+        )
+    return f"""<section class="src" id="{esc(section_key)}-sources">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="label">{esc(sources["label"])}</div>
+      <h2>{esc(sources["title"])}</h2>
+      <div class="hr"></div>
+    </div>
+    <div class="documents">{"".join(documents)}</div>
+    {archive_block}
+  </div>
+</section>
+
+"""
+
+
+def render_family_places(section_key: str, places: dict[str, Any]) -> str:
+    items = "".join(
+        f'<article class="place-item"><h3>{esc(item["name"])}</h3>'
+        f'<p>{esc(item["note"])}</p></article>'
+        for item in places["items"]
+    )
+    return f"""<section class="alt" id="{esc(section_key)}-places">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="label">{esc(places["label"])}</div>
+      <h2>{esc(places["title"])}</h2>
+      <div class="hr"></div>
+    </div>
+    <div class="place-list">{items}</div>
+  </div>
+</section>
+
+"""
+
+
+def render_family_chronicle(section_key: str, chronicle: dict[str, Any]) -> str:
+    events = []
+    for event in chronicle["events"]:
+        place = f'<p>{esc(event["place"])}</p>' if event.get("place") else ""
+        events.append(
+            f'<div class="tl-item"><div class="tl-gen">{esc(event["date"])}</div>'
+            f'<h3>{esc(event["title"])}</h3>{place}</div>'
+        )
+    return f"""<section id="{esc(section_key)}-timeline">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="label">{esc(chronicle["label"])}</div>
+      <h2>{esc(chronicle["title"])}</h2>
+      <div class="hr"></div>
+    </div>
+    <div class="tl">{"".join(events)}</div>
+  </div>
+</section>
+
+"""
+
+
+def render_family_gallery(section_key: str, gallery: dict[str, Any]) -> str:
+    """Reserve gallery support without publishing an empty section or navigation item."""
+    if not gallery["photos"]:
+        return ""
+    figures = []
+    for photo in gallery["photos"]:
+        caption = " · ".join(
+            esc(value) for value in (photo.get("date", ""), photo.get("caption", "")) if value
+        )
+        figures.append(
+            f'<figure><img src="{esc(photo["src"])}" alt="{esc(photo["alt"])}" loading="lazy">'
+            f'<figcaption>{caption}</figcaption></figure>'
+        )
+    return f"""<section class="alt" id="{esc(section_key)}-gallery">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="label">{esc(gallery["title"])}</div>
+      <h2>{esc(gallery["title"])}</h2>
+      <div class="hr"></div>
+    </div>
+    <div class="gallery-grid">{"".join(figures)}</div>
+  </div>
+</section>
+
+"""
+
+
+def render_family_page(
+    section_key: str,
+    section: dict[str, Any],
+    archive: dict[str, Any],
+) -> str:
+    cards = "".join(
+        branch_card(branch, f"#{section_key}-tree", archive["tree_link"])
+        for branch in section["branches"].values()
+    )
+    collateral = ""
+    if section.get("collateral"):
+        extra = section["collateral"]
+        extra_cards = "".join(branch_card(item) for item in extra["items"])
+        collateral = f"""<div class="collateral">
+  <div class="subsection-head">
+    <div class="label">{esc(extra["label"])}</div>
+    <h3>{esc(extra["title"])}</h3>
+    <p>{rich(extra["lead"])}</p>
+  </div>
+  <div class="grid g2">{extra_cards}</div>
+</div>"""
+    return f"""<div class="page" id="{esc(section["page_id"])}">
+<section class="pagehead" id="{esc(section_key)}">
+  <div class="wrap">
+    <div class="label">Семейный раздел</div>
+    <h1>{esc(section["title"])}</h1>
+    <p class="sub">{esc(section["lead"])}</p>
+  </div>
+</section>
+{render_section_nav(section_key, section)}
+<section id="{esc(section_key)}-branches">
+  <div class="wrap">
+    <div class="sect-head">
+      <div class="label">{esc(section["branches_label"])}</div>
+      <h2>{esc(section["branches_title"])}</h2>
+      <div class="hr"></div>
+    </div>
+    <div class="grid g2">{cards}</div>
+{collateral}
+  </div>
+</section>
+{render_family_sources(section_key, section["sources"])}
+{render_family_places(section_key, section["places"])}
+{render_family_chronicle(section_key, section["chronicle"])}
+{render_family_gallery(section_key, section["gallery"])}
+</div>
+
+"""
+
+
+def render_tree_page(
+    section_key: str,
+    section: dict[str, Any],
+    tree: dict[str, Any],
+    pedigree_svg: str,
+    anchor_text: str,
+) -> str:
+    """One selected pedigree view, with no research-goal publication."""
+    return f"""<div class="page" id="{esc(section["tree_page_id"])}">
+<section class="pagehead" id="{esc(section_key)}-tree">
+  <div class="wrap">
+    <div class="label">{esc(tree["label"])}</div>
+    <h1>{esc(section["tree_title"])}</h1>
+    <p class="sub">{esc(section["tree_lead"])}</p>
+    <p class="tree-family">{esc(anchor_text)}</p>
+  </div>
+</section>
+{render_section_nav(section_key, section)}
 <section class="treewrap" tabindex="0" role="region" aria-label="{esc(tree["h1"])}">
   <div class="wrap" style="max-width:none">{pedigree_svg}
     <div class="legend">
@@ -2180,34 +2286,25 @@ def render_tree_page(
     </div>
   </div>
 </section>
-
-<section class="alt">
-  <div class="wrap">
-    <div class="sect-head">
-      <div class="label">{esc(goals_text["label"])}</div>
-      <h2>{esc(goals_text["title"])}</h2>
-      <p>{esc(goals_text["lead"])}</p>
-      <div class="hr"></div>
-    </div>
-    <div class="grid g2">{goals_html}</div>
-  </div>
-</section>
 </div>
 
 """
 
 
-def render_footer(footer: dict[str, Any], export_date: str) -> str:
-    """Site footer."""
+def render_footer(footer: dict[str, Any]) -> str:
+    """Site footer with the single public privacy reminder."""
     return f"""<footer id="contacts">
-  <div class="wrap"><b>{esc(footer["brand"])}</b>{esc(footer["middle"])} {esc(export_date)}{esc(footer["suffix"])}</div>
+  <div class="wrap">
+    <b>{esc(footer["brand"])}</b>
+    <p class="footer-privacy">{rich(footer["privacy_note"])}</p>
+  </div>
 </footer>
 
 """
 
 
 def render_page_script() -> str:
-    """Client-side page switcher, section anchors and nav context over the hero."""
+    """Hash routing provides direct links to every section and both trees."""
     return """<script>
 var cachedNavH = 56;
 function measureNavHeight() {
@@ -2220,80 +2317,66 @@ function measureNavHeight() {
   }
   return cachedNavH;
 }
-function syncOverHero(forceOff) {
-  if (forceOff) {
-    document.body.classList.remove('over-hero');
-    return;
-  }
+function syncOverHero() {
   var heroEl = document.querySelector('#page1 .hero');
-  var page1 = document.getElementById('page1');
-  if (!heroEl || !page1 || !page1.classList.contains('visible')) {
+  var home = document.getElementById('page1');
+  if (!heroEl || !home || !home.classList.contains('visible')) {
     document.body.classList.remove('over-hero');
     return;
   }
   var rect = heroEl.getBoundingClientRect();
   document.body.classList.toggle('over-hero', rect.bottom > cachedNavH + 8);
 }
-function showPage(n) {
-  document.getElementById('page1').classList.toggle('visible', n===1);
-  document.getElementById('page2').classList.toggle('visible', n===2);
-  document.querySelectorAll('nav .navbtn').forEach(function(btn) {
-    var isTree = btn.getAttribute('data-nav') === 'tree';
-    var isActive = n===2 ? isTree : (!isTree && btn.id === 'nb1');
-    btn.classList.toggle('active', isActive);
+function resolveRoute() {
+  var hash = window.location.hash.slice(1) || 'top';
+  var target = document.getElementById(hash);
+  if (!target) {
+    hash = 'top';
+    target = document.getElementById('top');
+  }
+  var page = target.closest('.page');
+  if (!page) return;
+  document.querySelectorAll('.page').forEach(function(candidate) {
+    candidate.classList.toggle('visible', candidate === page);
+  });
+  var current = 'about';
+  if (hash.indexOf('matyukhiny') === 0) current = 'matyukhiny';
+  if (hash.indexOf('skiba') === 0) current = 'skiba';
+  document.querySelectorAll('nav .navbtn').forEach(function(link) {
+    var isActive = link.getAttribute('data-section') === current;
+    link.classList.toggle('active', isActive);
     if (isActive) {
-      btn.setAttribute('aria-current', 'true');
+      link.setAttribute('aria-current', 'true');
     } else {
-      btn.removeAttribute('aria-current');
+      link.removeAttribute('aria-current');
     }
   });
-  if (n === 2) {
-    window.scrollTo({top:0});
-    syncOverHero(true);
-  } else {
-    syncOverHero(false);
-  }
-}
-function goNav(target) {
-  if (target === 'tree') {
-    showPage(2);
-    return;
-  }
-  showPage(1);
-  var el = document.getElementById(target === 'top' ? 'top' : target);
-  if (el) {
-    requestAnimationFrame(function() {
-      el.scrollIntoView({behavior:'smooth', block:'start'});
-    });
-  } else {
-    window.scrollTo({top:0, behavior:'smooth'});
-  }
-}
-document.querySelectorAll('[data-nav]').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    goNav(btn.getAttribute('data-nav'));
+  syncOverHero();
+  requestAnimationFrame(function() {
+    target.scrollIntoView({block:'start'});
+    syncOverHero();
   });
-});
+}
+window.addEventListener('hashchange', resolveRoute);
 var heroEl = document.querySelector('#page1 .hero');
 if (heroEl && 'IntersectionObserver' in window) {
-  new IntersectionObserver(function() {
-    syncOverHero(false);
-  }, {threshold: [0, 0.01, 0.1, 0.25, 0.5, 1]}).observe(heroEl);
+  new IntersectionObserver(syncOverHero, {threshold: [0, 0.01, 0.1, 0.25, 0.5, 1]}).observe(heroEl);
 }
-window.addEventListener('scroll', function() { syncOverHero(false); }, {passive: true});
+window.addEventListener('scroll', syncOverHero, {passive: true});
 window.addEventListener('resize', function() {
   measureNavHeight();
-  syncOverHero(false);
+  syncOverHero();
 });
 measureNavHeight();
+resolveRoute();
 requestAnimationFrame(function() {
   measureNavHeight();
-  syncOverHero(false);
+  syncOverHero();
 });
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(function() {
     measureNavHeight();
-    syncOverHero(false);
+    syncOverHero();
   });
 }
 </script>
@@ -2307,67 +2390,46 @@ def build_html(
     meta: dict[str, str],
     content: dict[str, Any],
 ) -> str:
-    root_id = meta["root"]
-    family = resolve_family_context(people, families, root_id)
-    st = stats(people, families, meta.get("database"))
-    father_line = direct_lines(root_id, people, families)["father"]
-    mother_line = direct_lines(root_id, people, families)["mother"]
-    skiba_father = direct_lines(family.spouse.id, people, families)["father"]
-    skiba_mother = direct_lines(family.spouse.id, people, families)["mother"]
-
-    gens_father = count_generations(root_id, people, families)
-    gens_skiba = count_generations(family.spouse.id, people, families)
-    documented_gens = max(gens_father, gens_skiba) + 1
-    goals = missing_parent_goals([root_id, family.spouse.id], people, families)
-    gen_names = generation_names(content)
-
-    # Full paternal chain, same depth as the pedigree chart — down to the
-    # 1834 Mokroe ancestors (Fedot, Grigory, Ilya, Matvey).
-    timeline_people = father_line
-    if len(timeline_people) < 4:
-        timeline_people = skiba_father
-
-    places_html = build_places_html(
-        content["places"], published_places(meta.get("database") or {})
-    )
-    surnames_html = build_surnames_html(content["surnames"], st["top_surnames"])
-    goals_html = build_goals_html(content["tree"], goals, gen_names)
-    pedigree_svg = render_pedigree_svg(
-        family.root,
-        family.spouse,
-        family.child,
-        people,
-        families,
-        content,
-        # Deep enough to reach the 1834 Mokroe ancestors: Fedot (4),
-        # Grigory (5), Ilya (6) and Matvey (7).
-        max_gen=7,
-    )
-    export_date = format_date(meta.get("date", "")) or "2026"
-    with_parents = (meta.get("database") or {}).get("with_parents")
+    family = resolve_family_context(people, families, meta["root"])
     css = CSS.read_text(encoding="utf-8") if CSS.exists() else ""
+    parts = [
+        render_document_start(content["meta"], css),
+        render_nav(content["meta"]),
+        render_home_page(content),
+    ]
 
-    return (
-        render_document_start(content["meta"], css)
-        + render_nav(content["meta"])
-        + render_chronicle_page(
+    for section_key, section in content["sections"].items():
+        parts.append(render_family_page(section_key, section, content["archive"]))
+
+    roots = {"root": family.root, "spouse": family.spouse}
+    for section_key, section in content["sections"].items():
+        root = roots[section["root"]]
+        spouse = family.spouse if root.id == family.root.id else family.root
+        id_prefix = "pedigree" if section_key == "matyukhiny" else f"pedigree-{section_key}"
+        pedigree_svg = render_pedigree_svg(
+            root,
+            spouse,
+            family.child,
+            people,
+            families,
             content,
-            st,
-            family,
-            father_line,
-            mother_line,
-            skiba_father,
-            skiba_mother,
-            documented_gens,
-            export_date,
-            timeline_people,
-            places_html,
-            surnames_html,
+            max_gen=7,
+            include_spouse_ancestors=False,
+            id_prefix=id_prefix,
+            description=section["tree_lead"],
         )
-        + render_tree_page(content["tree"], people, goals, pedigree_svg, goals_html, with_parents)
-        + render_footer(content["footer"], export_date)
-        + render_page_script()
-    )
+        parts.append(
+            render_tree_page(
+                section_key,
+                section,
+                content["tree"],
+                pedigree_svg,
+                family_anchor_text(family),
+            )
+        )
+
+    parts.extend([render_footer(content["footer"]), render_page_script()])
+    return "".join(parts)
 
 
 def validate_inputs() -> None:

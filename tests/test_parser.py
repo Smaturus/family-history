@@ -160,8 +160,9 @@ def test_build_on_fixture(tmp_path):
     """Сборка на фикстуре: HTML цел, точные даты живых не утекли."""
     code, log, html = build_in_tmp(tmp_path)
     assert code == 0, log
-    assert html.count("<svg") >= 1
+    assert html.count('<svg class="pedigree"') == 2
     assert 'id="page2"' in html
+    assert 'id="page3"' in html
     assert "р. 1971" in html                 # год живого корня разрешён политикой
     assert "р. 2001" in html                 # год живого ребёнка-якоря тоже
     assert "Гипотеза" in html                # бейдж гипотезы рендерится
