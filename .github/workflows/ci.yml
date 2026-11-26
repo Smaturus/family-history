@@ -1,0 +1,43 @@
+name: CI build smoke test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -q
+
+      # Реальные данные с ПДн в CI не попадают (см. ADR «CI-сборка на фикстуре»):
+      # вместо коммитимого data/family.yaml в рабочую копию подкладывается
+      # синтетическая фикстура с вымышленными людьми.
+      - name: Prepare fixture data
+        run: |
+          mkdir -p data
+          cp tests/fixtures/minimal.yaml data/family.yaml
+
+      - name: Build site
+        run: python scripts/build_site.py
+
+      - name: Verify output integrity
+        run: |
+          test -f index.html
+          grep -q "<svg" index.html
+          grep -q 'id="page2"' index.html
