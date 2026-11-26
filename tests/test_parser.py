@@ -15,7 +15,8 @@ import yaml
 
 import pytest
 
-from parse_data import Person, direct_lines, load_family
+from build_site import person_search_text
+from parse_data import Person, direct_lines, format_date, load_family
 
 REPO = Path(__file__).resolve().parents[1]
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "minimal.yaml"
@@ -29,12 +30,16 @@ def fixture_data():
     return yaml.safe_load(FIXTURE.read_text(encoding="utf-8"))
 
 
-def build_in_tmp(tmp_path, with_data=True):
+def build_in_tmp(tmp_path, with_data=True, data=None):
     """Полная сборка в копии репозитория; возвращает (exit_code, stderr, html)."""
     dst = tmp_path / "repo"
     shutil.copytree(REPO, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
     (dst / "data").mkdir(exist_ok=True)
-    if with_data:
+    if data is not None:
+        (dst / "data" / "family.yaml").write_text(
+            yaml.safe_dump(data, allow_unicode=True), encoding="utf-8"
+        )
+    elif with_data:
         shutil.copy(FIXTURE, dst / "data" / "family.yaml")
     else:
         # В рабочей копии data/family.yaml может лежать локально — для
@@ -84,13 +89,33 @@ def test_direct_lines_walk_the_chain():
     assert line == ["t01", "t04", "t06", "t07"]
 
 
-def test_status_matches_birth_date_shape():
-    """Статус карточки выводится из даты: «ок.»/нет года → гипотеза."""
+def test_date_shape_and_hypothesis_status_are_independent():
+    """Квалификатор даты не создаёт гипотезу о личности или родственной связи."""
     people, _, _ = load()
     assert people["t04"].birth_precision == "year"
     assert not people["t04"].is_reconstructed
     assert people["t06"].is_reconstructed          # «ок. 1910»
     assert people["t07"].is_reconstructed          # дат нет вовсе
+    assert people["t06"].is_hypothesis             # явный status: hyp
+    approximate = Person(id="ok-date", birt="ок. 1910", deceased=True, status="ok")
+    assert approximate.is_reconstructed
+    assert not approximate.is_hypothesis
+
+
+def test_glued_month_and_year_are_separated_only_for_display():
+    """Склейка разделяется пробелом без выбора между вариантами месяца."""
+    assert format_date("ма1919") == "ма 1919"
+    assert format_date("мар. 1919") == "мар. 1919"
+    assert format_date("ок. 1818") == "ок. 1818"
+
+
+def test_search_uses_recorded_and_gendered_surname_forms():
+    """Двойная фамилия ищется целиком и по компонентам, без гибридных форм."""
+    person = Person(id="names", givn="Григорий", surn="Захаров/Алексеев", sex="M")
+    search = person_search_text(person)
+    assert "Захаров/Алексеев" in search
+    assert "Захарова" in search and "Алексеева" in search
+    assert "Захаров/Алексеева" not in search
 
 
 # --- Приватность -------------------------------------------------------------
@@ -168,6 +193,43 @@ def test_build_on_fixture(tmp_path):
     assert "Гипотеза" in html                # бейдж гипотезы рендерится
     assert "мать не найдена" in html         # заглушка для отсутствующей матери t02
     assert "Древо прямых предков" in html
+
+
+def test_tree_controls_and_public_search_are_built_for_both_trees(tmp_path):
+    """У каждого древа есть поиск, область поиска и четыре независимых действия."""
+    code, log, html = build_in_tmp(tmp_path)
+    assert code == 0, log
+    assert html.count('data-search-tree=') == 2
+    assert 'data-controls-tree="matyukhiny"' in html
+    assert 'data-controls-tree="skiba"' in html
+    for action in ("zoom-out", "zoom-in", "fit", "reset"):
+        assert html.count(f'data-tree-action="{action}"') == 2
+    assert 'data-tree="matyukhiny"' in html and 'data-tree="skiba"' in html
+    assert 'id="pedigree-t01"' in html and 'id="pedigree-skiba-t01"' in html
+    assert 'data-years="р. 1971"' in html
+    assert "touch-action:none" in html
+    assert "startPinch" in html
+
+
+def test_search_excludes_people_outside_public_trees(tmp_path):
+    """Персона вне обоих SVG не попадает даже в скрытый поисковый индекс."""
+    data = fixture_data()
+    data["persons"].append({
+        "id": "t99", "surname": "Непубличный", "name": "Человек",
+        "birth": "1900", "deceased": True, "status": "ok",
+    })
+    code, log, html = build_in_tmp(tmp_path, data=data)
+    assert code == 0, log
+    assert "Непубличный" not in html
+
+
+def test_search_does_not_publish_private_notes(tmp_path):
+    """В data-search и data-years нет note и иных закрытых полей живого человека."""
+    data = fixture_data()
+    data["persons"][0]["note"] = "Закрытая служебная пометка"
+    code, log, html = build_in_tmp(tmp_path, data=data)
+    assert code == 0, log
+    assert "Закрытая служебная пометка" not in html
 
 
 def test_build_fails_cleanly_without_data(tmp_path):

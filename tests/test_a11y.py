@@ -24,10 +24,23 @@ def test_pedigree_svg_has_text_alternatives(tmp_path):
 
 
 def test_treewrap_scrollable_region_focusable(tmp_path):
-    """Прокручиваемый контейнер древа доступен с клавиатуры."""
+    """Оба масштабируемых скроллпорта доступны с клавиатуры и имеют имена."""
     code, log, html = build_in_tmp(tmp_path)
     assert code == 0, log
-    assert 'class="treewrap" tabindex="0" role="region" aria-label="Древо прямых предков"' in html
+    assert 'class="treewrap" tabindex="0" role="region" aria-label="Древо Матюхиных"' in html
+    assert 'class="treewrap" tabindex="0" role="region" aria-label="Древо Скиба"' in html
+    assert html.count('class="treewrap" tabindex="0" role="region"') == 2
+
+
+def test_search_and_zoom_controls_have_accessible_names(tmp_path):
+    """Поля, выбор области и кнопки масштаба имеют явные доступные подписи."""
+    code, log, html = build_in_tmp(tmp_path)
+    assert code == 0, log
+    assert html.count('role="combobox" aria-autocomplete="list"') == 2
+    assert html.count('aria-label="Область поиска"') == 2
+    assert html.count('aria-label="Увеличить древо"') == 2
+    assert html.count('aria-label="Уменьшить древо"') == 2
+    assert html.count('aria-label="Текущий масштаб"') == 2
 
 
 def test_nav_active_state_announced(tmp_path):

@@ -401,11 +401,22 @@ def validate_content(content: Any) -> None:
     require_keys(
         tree,
         "tree",
-        ["label", "h1", "column_titles", "status", "missing_father", "missing_mother", "legend"],
+        [
+            "label", "h1", "column_titles", "status", "missing_father", "missing_mother",
+            "search", "controls", "legend",
+        ],
     )
     require_list(tree["column_titles"], "tree.column_titles", min_len=6)
     require_keys(require_mapping(tree["status"], "tree.status"), "tree.status", ["ok", "hyp", "q"])
-    require_keys(require_mapping(tree["legend"], "tree.legend"), "tree.legend", ["ok", "hyp", "q", "anchor"])
+    search = require_mapping(tree["search"], "tree.search")
+    require_keys(search, "tree.search", ["label", "placeholder", "local", "global", "no_results"])
+    controls = require_mapping(tree["controls"], "tree.controls")
+    require_keys(controls, "tree.controls", ["group", "zoom_out", "zoom_in", "fit", "reset"])
+    require_keys(
+        require_mapping(tree["legend"], "tree.legend"),
+        "tree.legend",
+        ["unknown", "approx", "ok", "hyp", "q"],
+    )
     require_str(tree["missing_father"], "tree.missing_father")
     require_str(tree["missing_mother"], "tree.missing_mother")
 
@@ -605,16 +616,83 @@ def render_badge(x: float, cy: float, status: str, labels: dict[str, str]) -> st
     )
 
 
-def render_person_box(x: float, cy: float, person: Person, extra: list[str], labels: dict[str, str]) -> str:
-    status = "hyp" if person.is_reconstructed else "ok"
+def surname_search_forms(surname: str, sex: str) -> set[str]:
+    """Use recorded spellings and their regular masculine/feminine counterparts."""
+    forms = {surname}
+    for match in re.finditer(r"\(([^)]*)\)", surname):
+        for alternative in match.group(1).split(","):
+            alternative = alternative.strip().rstrip("?")
+            if alternative:
+                forms.add(alternative)
+    without_alternatives = re.sub(r"\([^)]*\)", "", surname).strip()
+    if without_alternatives:
+        forms.add(without_alternatives)
+
+    for form in list(forms):
+        for part in re.split(r"\s*[/—-]\s*", form):
+            part = part.strip().rstrip("?")
+            if part:
+                forms.add(part)
+
+    for form in list(forms):
+        if re.search(r"[/—-]|\([^)]*\)", form):
+            continue
+        if sex != "M":
+            if form.endswith("ая"):
+                forms.add(form[:-2] + "ий")
+            elif form.endswith(("ова", "ева", "ина")):
+                forms.add(form[:-1])
+        if sex != "F":
+            if form.endswith("ий"):
+                forms.add(form[:-2] + "ая")
+            elif form.endswith(("ов", "ев", "ин")):
+                forms.add(form + "а")
+    return {form for form in forms if form}
+
+
+def person_search_text(person: Person) -> str:
+    """Public name forms only; notes, places and non-public dates stay out."""
+    forms = {person.name, person.label, person.display_name}
+    forms.update(surname_search_forms(person.surname, person.sex))
+    for match in re.finditer(r"\(([^)]*)\)", person.name):
+        alternative = match.group(1).strip().rstrip("?")
+        if alternative and len(alternative) > 2:
+            forms.add(alternative)
+        if len(alternative) <= 2:
+            forms.add(re.sub(r"\([^)]*\)", alternative, person.name))
+    without_alternatives = re.sub(r"\([^)]*\)", "", person.name).strip()
+    if without_alternatives:
+        forms.add(without_alternatives)
+    return " | ".join(sorted(form for form in forms if form))
+
+
+def render_person_box(
+    x: float,
+    cy: float,
+    person: Person,
+    extra: list[str],
+    labels: dict[str, str],
+    card_id: str,
+) -> str:
+    status = "hyp" if person.is_hypothesis else "ok"
+    classes = ["bx", status, *extra]
+    if not person.birt and not person.deat:
+        classes.append("unknown")
+    if any(
+        (value or "").split(" ", 1)[0] in {"ок.", "до", "после", "между"}
+        for value in (person.birt, person.deat)
+    ):
+        classes.append("approx")
     surname = person.surname or person.name
     given = person.name if person.surname else ""
     years = person.public_years.replace("р. ", "").replace("ум. ", "† ")
     if years == "? – ?":
-        years = ""
+        years = "даты неизвестны"
 
     return (
-        f'<g class="{" ".join(["bx", status, *extra])}">'
+        f'<g id="{esc(card_id)}" class="{" ".join(classes)}" '
+        f'data-person-id="{esc(person.id)}" data-search="{esc(person_search_text(person))}" '
+        f'data-years="{esc(person.public_years)}">'
         f'<rect class="fr" x="{x}" y="{cy - BOX_H / 2:.1f}" width="{BOX_W}" height="{BOX_H}" rx="10"/>'
         f'<text class="t1" x="{x + 12}" y="{cy - 22:.1f}">{esc(surname)}</text>'
         f'<text class="t2" x="{x + 12}" y="{cy - 5:.1f}">{esc(given)}</text>'
@@ -623,7 +701,7 @@ def render_person_box(x: float, cy: float, person: Person, extra: list[str], lab
     )
 
 
-def render_box(node: TreeNode, labels: dict[str, str]) -> str:
+def render_box(node: TreeNode, labels: dict[str, str], id_prefix: str) -> str:
     x = LEFT_PAD + node.gen * COL_W
 
     if node.is_missing:
@@ -641,10 +719,12 @@ def render_box(node: TreeNode, labels: dict[str, str]) -> str:
     extra: list[str] = []
     if node.gen == 0:
         extra.append("me")
-    elif not node.children and person.birt and not person.is_reconstructed:
+    elif not node.children:
         extra.append("deep")
 
-    return render_person_box(x, node.y, person, extra, labels)
+    return render_person_box(
+        x, node.y, person, extra, labels, f"{id_prefix}-{person.id}"
+    )
 
 
 def render_pedigree_svg(
@@ -697,17 +777,22 @@ def render_pedigree_svg(
     if child:
         y_child = (father_tree.y + mother_tree.y) / 2
         parts.append(f'<path class="ln" d="M{x_mid} {y_child:.1f} H{LEFT_PAD}"/>')
-        parts.append(render_person_box(LEFT_PAD, y_child, child, ["me"], labels))
+        parts.append(
+            render_person_box(
+                LEFT_PAD, y_child, child, ["me"], labels, f"{id_prefix}-{child.id}"
+            )
+        )
 
     for node in nodes:
-        parts.append(render_box(node, labels))
+        parts.append(render_box(node, labels, id_prefix))
 
     width = LEFT_PAD * 2 + (max_gen + 1) * COL_W
     height = max(node.y for node in nodes) + ROW_H
 
     return (
         f'<svg class="pedigree" viewBox="0 0 {width} {height:.0f}" '
-        f'xmlns="http://www.w3.org/2000/svg" style="min-width:{width}px" '
+        f'width="{width}" height="{height:.0f}" '
+        f'xmlns="http://www.w3.org/2000/svg" '
         f'role="img" aria-labelledby="{id_prefix}-title {id_prefix}-desc">'
         f'<title id="{id_prefix}-title">{esc(content["tree"]["h1"])}</title>'
         f'<desc id="{id_prefix}-desc">{esc(description or content["tree"]["h1"])}</desc>'
@@ -2262,28 +2347,49 @@ def render_tree_page(
     section: dict[str, Any],
     tree: dict[str, Any],
     pedigree_svg: str,
-    anchor_text: str,
 ) -> str:
-    """One selected pedigree view, with no research-goal publication."""
+    """One pedigree with scoped public search and independent view controls."""
+    search = tree["search"]
+    controls = tree["controls"]
+    search_id = f"search-{section_key}"
+    results_id = f"results-{section_key}"
     return f"""<div class="page" id="{esc(section["tree_page_id"])}">
-<section class="pagehead" id="{esc(section_key)}-tree">
-  <div class="wrap">
-    <div class="label">{esc(tree["label"])}</div>
-    <h1>{esc(section["tree_title"])}</h1>
-    <p class="sub">{esc(section["tree_lead"])}</p>
-    <p class="tree-family">{esc(anchor_text)}</p>
-  </div>
-</section>
 {render_section_nav(section_key, section)}
-<section class="treewrap" tabindex="0" role="region" aria-label="{esc(tree["h1"])}">
-  <div class="wrap" style="max-width:none">{pedigree_svg}
-    <div class="legend">
-      <span>{esc(tree["legend"]["ok"])}</span>
-      <span><i class="hyp"></i>{esc(tree["legend"]["hyp"])}</span>
-      <span><i class="q"></i>{esc(tree["legend"]["q"])}</span>
-      <span><i class="anchor"></i>{esc(tree["legend"]["anchor"])}</span>
+<section class="pagehead tree-pagehead" id="{esc(section_key)}-tree">
+  <div class="wrap">
+    <h1>{esc(section["tree_title"])}</h1>
+    <div class="tree-toolbar">
+      <div class="tree-search" data-search-tree="{esc(section_key)}">
+        <label class="sr-only" for="{search_id}">{esc(search["label"])}</label>
+        <div class="search-fields">
+          <input id="{search_id}" type="search" placeholder="{esc(search["placeholder"])}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{results_id}">
+          <label class="sr-only" for="scope-{section_key}">Область поиска</label>
+          <select id="scope-{section_key}" aria-label="Область поиска">
+            <option value="local">{esc(search["local"])}</option>
+            <option value="global">{esc(search["global"])}</option>
+          </select>
+        </div>
+        <div class="search-results" id="{results_id}" role="listbox" aria-label="{esc(search["label"])}" hidden></div>
+      </div>
+      <div class="tree-controls" data-controls-tree="{esc(section_key)}" role="group" aria-label="{esc(controls["group"])}">
+        <button type="button" data-tree-action="zoom-out" aria-label="{esc(controls["zoom_out"])}" title="{esc(controls["zoom_out"])}">−</button>
+        <output data-zoom-value aria-live="polite" aria-label="Текущий масштаб">100%</output>
+        <button type="button" data-tree-action="zoom-in" aria-label="{esc(controls["zoom_in"])}" title="{esc(controls["zoom_in"])}">+</button>
+        <button type="button" class="tree-view-button" data-tree-action="fit">{esc(controls["fit"])}</button>
+        <button type="button" class="tree-view-button" data-tree-action="reset">{esc(controls["reset"])}</button>
+      </div>
+    </div>
+    <div class="legend" aria-label="Условные обозначения">
+      <span><i class="unknown" aria-hidden="true">?</i>{esc(tree["legend"]["unknown"])}</span>
+      <span><i class="approx" aria-hidden="true">ок.</i>{esc(tree["legend"]["approx"])}</span>
+      <span><i class="ok" aria-hidden="true"></i>{esc(tree["legend"]["ok"])}</span>
+      <span><i class="hyp" aria-hidden="true"></i>{esc(tree["legend"]["hyp"])}</span>
+      <span><i class="q" aria-hidden="true"></i>{esc(tree["legend"]["q"])}</span>
     </div>
   </div>
+</section>
+<section class="treewrap" tabindex="0" role="region" aria-label="{esc(section["tree_title"])}" data-tree="{esc(section_key)}" data-section-title="{esc(section["title"])}" data-no-results="{esc(search["no_results"])}">
+  <div class="tree-stage">{pedigree_svg}</div>
 </section>
 </div>
 
@@ -2302,9 +2408,12 @@ def render_footer(footer: dict[str, Any]) -> str:
 
 
 def render_page_script() -> str:
-    """Hash routing provides direct links to every section and both trees."""
+    """Hash routing, scoped public search and independent SVG pan/zoom."""
     return """<script>
 var cachedNavH = 56;
+var treeViews = {};
+var pendingTreeFocus = null;
+
 function measureNavHeight() {
   var nav = document.querySelector('nav');
   if (!nav) return cachedNavH;
@@ -2315,6 +2424,7 @@ function measureNavHeight() {
   }
   return cachedNavH;
 }
+
 function syncOverHero() {
   var heroEl = document.querySelector('#page1 .hero');
   var home = document.getElementById('page1');
@@ -2325,6 +2435,291 @@ function syncOverHero() {
   var rect = heroEl.getBoundingClientRect();
   document.body.classList.toggle('over-hero', rect.bottom > cachedNavH + 8);
 }
+
+function applyTreeScale(view, requested) {
+  var next = Math.max(0.05, Math.min(4, requested));
+  view.scale = next;
+  view.svg.style.width = (view.baseWidth * next) + 'px';
+  view.svg.style.height = (view.baseHeight * next) + 'px';
+  view.wrap.setAttribute('data-scale', next.toFixed(3));
+  var output = document.querySelector('[data-controls-tree="' + view.key + '"] [data-zoom-value]');
+  if (output) output.textContent = Math.round(next * 100) + '%';
+}
+
+function zoomTree(view, factor, clientX, clientY) {
+  if (!view.wrap.closest('.page').classList.contains('visible')) return;
+  var next = Math.max(0.05, Math.min(4, view.scale * factor));
+  if (next === view.scale) return;
+  var rect = view.wrap.getBoundingClientRect();
+  var px = clientX == null ? view.wrap.clientWidth / 2 : clientX - rect.left;
+  var py = clientY == null ? view.wrap.clientHeight / 2 : clientY - rect.top;
+  var treeX = (view.wrap.scrollLeft + px - view.svg.offsetLeft) / view.scale;
+  var treeY = (view.wrap.scrollTop + py - view.svg.offsetTop) / view.scale;
+  applyTreeScale(view, next);
+  view.wrap.scrollLeft = view.svg.offsetLeft + treeX * next - px;
+  view.wrap.scrollTop = view.svg.offsetTop + treeY * next - py;
+}
+
+function fitTree(view) {
+  if (!view.wrap.closest('.page').classList.contains('visible')) return;
+  var style = getComputedStyle(view.stage);
+  var horizontal = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  var vertical = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  var next = Math.min(
+    (view.wrap.clientWidth - horizontal) / view.baseWidth,
+    (view.wrap.clientHeight - vertical) / view.baseHeight
+  );
+  applyTreeScale(view, next);
+  view.wrap.scrollLeft = Math.max(0, (view.wrap.scrollWidth - view.wrap.clientWidth) / 2);
+  view.wrap.scrollTop = Math.max(0, (view.wrap.scrollHeight - view.wrap.clientHeight) / 2);
+}
+
+function resetTree(view) {
+  applyTreeScale(view, 1);
+  view.wrap.scrollLeft = 0;
+  view.wrap.scrollTop = 0;
+}
+
+function clearTreeHighlight() {
+  document.querySelectorAll('.pedigree .search-hit').forEach(function(card) {
+    card.classList.remove('search-hit');
+  });
+}
+
+function focusTreeCard(focus) {
+  var view = treeViews[focus.tree];
+  var card = document.getElementById(focus.cardId);
+  if (!view || !card) return;
+  clearTreeHighlight();
+  var wrapRect = view.wrap.getBoundingClientRect();
+  var cardRect = card.getBoundingClientRect();
+  view.wrap.scrollLeft += cardRect.left + cardRect.width / 2 - wrapRect.left - view.wrap.clientWidth / 2;
+  view.wrap.scrollTop += cardRect.top + cardRect.height / 2 - wrapRect.top - view.wrap.clientHeight / 2;
+  card.classList.add('search-hit');
+  view.wrap.focus({preventScroll: true});
+}
+
+function initTree(wrap) {
+  var svg = wrap.querySelector('.pedigree');
+  if (!svg) return;
+  var box = svg.viewBox.baseVal;
+  var view = {
+    key: wrap.getAttribute('data-tree'),
+    wrap: wrap,
+    stage: wrap.querySelector('.tree-stage'),
+    svg: svg,
+    baseWidth: box.width,
+    baseHeight: box.height,
+    scale: 1
+  };
+  treeViews[view.key] = view;
+  applyTreeScale(view, 1);
+
+  var controls = document.querySelector('[data-controls-tree="' + view.key + '"]');
+  if (controls) {
+    controls.querySelectorAll('[data-tree-action]').forEach(function(button) {
+      button.addEventListener('click', function() {
+        var action = button.getAttribute('data-tree-action');
+        if (action === 'zoom-in') zoomTree(view, 1.25);
+        if (action === 'zoom-out') zoomTree(view, 0.8);
+        if (action === 'fit') fitTree(view);
+        if (action === 'reset') resetTree(view);
+      });
+    });
+  }
+
+  var pointers = new Map();
+  var drag = null;
+  var pinch = null;
+
+  function pointerPair() {
+    return Array.from(pointers.values()).slice(0, 2);
+  }
+
+  function startPinch() {
+    var pair = pointerPair();
+    if (pair.length < 2) return;
+    var rect = wrap.getBoundingClientRect();
+    var mx = (pair[0].x + pair[1].x) / 2 - rect.left;
+    var my = (pair[0].y + pair[1].y) / 2 - rect.top;
+    pinch = {
+      distance: Math.max(1, Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y)),
+      scale: view.scale,
+      treeX: (wrap.scrollLeft + mx - svg.offsetLeft) / view.scale,
+      treeY: (wrap.scrollTop + my - svg.offsetTop) / view.scale
+    };
+    drag = null;
+  }
+
+  wrap.addEventListener('pointerdown', function(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointers.set(event.pointerId, {id: event.pointerId, x: event.clientX, y: event.clientY});
+    wrap.setPointerCapture(event.pointerId);
+    wrap.classList.add('is-panning');
+    if (pointers.size === 1) {
+      drag = {id: event.pointerId, x: event.clientX, y: event.clientY, left: wrap.scrollLeft, top: wrap.scrollTop};
+      pinch = null;
+    } else if (pointers.size === 2) {
+      startPinch();
+    }
+    event.preventDefault();
+  });
+
+  wrap.addEventListener('pointermove', function(event) {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.set(event.pointerId, {id: event.pointerId, x: event.clientX, y: event.clientY});
+    if (pointers.size >= 2) {
+      if (!pinch) startPinch();
+      var pair = pointerPair();
+      var distance = Math.max(1, Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y));
+      var rect = wrap.getBoundingClientRect();
+      var mx = (pair[0].x + pair[1].x) / 2 - rect.left;
+      var my = (pair[0].y + pair[1].y) / 2 - rect.top;
+      applyTreeScale(view, pinch.scale * distance / pinch.distance);
+      wrap.scrollLeft = svg.offsetLeft + pinch.treeX * view.scale - mx;
+      wrap.scrollTop = svg.offsetTop + pinch.treeY * view.scale - my;
+    } else if (drag && drag.id === event.pointerId) {
+      wrap.scrollLeft = drag.left - (event.clientX - drag.x);
+      wrap.scrollTop = drag.top - (event.clientY - drag.y);
+    }
+    event.preventDefault();
+  });
+
+  function endPointer(event) {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.delete(event.pointerId);
+    pinch = null;
+    drag = null;
+    if (pointers.size === 1) {
+      var remaining = pointerPair()[0];
+      drag = {id: remaining.id, x: remaining.x, y: remaining.y, left: wrap.scrollLeft, top: wrap.scrollTop};
+    }
+    if (pointers.size === 0) wrap.classList.remove('is-panning');
+  }
+  wrap.addEventListener('pointerup', endPointer);
+  wrap.addEventListener('pointercancel', endPointer);
+  wrap.addEventListener('lostpointercapture', endPointer);
+  wrap.addEventListener('dragstart', function(event) { event.preventDefault(); });
+}
+
+function normalizedSearch(value) {
+  return (value || '').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/gi, ' ').trim();
+}
+
+function hideSearchResults(search) {
+  var results = search.querySelector('.search-results');
+  results.hidden = true;
+  search.querySelector('input').setAttribute('aria-expanded', 'false');
+}
+
+function chooseSearchResult(search, button) {
+  var focus = {cardId: button.getAttribute('data-card-id'), tree: button.getAttribute('data-tree')};
+  hideSearchResults(search);
+  if (window.location.hash === '#' + focus.tree + '-tree') {
+    pendingTreeFocus = null;
+    requestAnimationFrame(function() { focusTreeCard(focus); });
+  } else {
+    pendingTreeFocus = focus;
+    window.location.hash = focus.tree + '-tree';
+  }
+}
+
+function renderSearchResults(search) {
+  var input = search.querySelector('input');
+  var scope = search.querySelector('select').value;
+  var localTree = search.getAttribute('data-search-tree');
+  var results = search.querySelector('.search-results');
+  var query = normalizedSearch(input.value);
+  results.textContent = '';
+  if (!query) {
+    hideSearchResults(search);
+    return;
+  }
+  var tokens = query.split(/\\s+/);
+  var matches = [];
+  document.querySelectorAll('.pedigree .bx[data-search]').forEach(function(card) {
+    var tree = card.closest('.treewrap').getAttribute('data-tree');
+    if (scope === 'local' && tree !== localTree) return;
+    var haystack = normalizedSearch(card.getAttribute('data-search'));
+    if (!tokens.every(function(token) { return haystack.indexOf(token) !== -1; })) return;
+    matches.push(card);
+  });
+  matches.sort(function(a, b) {
+    var an = a.getAttribute('data-search');
+    var bn = b.getAttribute('data-search');
+    return an.localeCompare(bn, 'ru') || a.id.localeCompare(b.id);
+  });
+
+  if (!matches.length) {
+    var empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = document.querySelector('.treewrap[data-tree="' + localTree + '"]').getAttribute('data-no-results');
+    results.appendChild(empty);
+  }
+  matches.forEach(function(card) {
+    var wrap = card.closest('.treewrap');
+    var tree = wrap.getAttribute('data-tree');
+    var name = Array.from(card.querySelectorAll('.t1, .t2')).map(function(text) {
+      return text.textContent.trim();
+    }).filter(Boolean).join(' ');
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'search-result';
+    button.setAttribute('role', 'option');
+    button.setAttribute('aria-selected', 'false');
+    button.setAttribute('data-card-id', card.id);
+    button.setAttribute('data-tree', tree);
+    var nameEl = document.createElement('span');
+    nameEl.className = 'result-name';
+    nameEl.textContent = name;
+    var yearsEl = document.createElement('span');
+    yearsEl.className = 'result-years';
+    yearsEl.textContent = card.getAttribute('data-years');
+    button.appendChild(nameEl);
+    button.appendChild(yearsEl);
+    if (scope === 'global') {
+      var sectionEl = document.createElement('span');
+      sectionEl.className = 'result-section';
+      sectionEl.textContent = wrap.getAttribute('data-section-title');
+      button.appendChild(sectionEl);
+    }
+    button.addEventListener('click', function() { chooseSearchResult(search, button); });
+    button.addEventListener('keydown', function(event) {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      var sibling = event.key === 'ArrowDown' ? button.nextElementSibling : button.previousElementSibling;
+      if (sibling && sibling.classList.contains('search-result')) sibling.focus();
+    });
+    results.appendChild(button);
+  });
+  results.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+
+function initSearch(search) {
+  var input = search.querySelector('input');
+  input.addEventListener('input', function() { renderSearchResults(search); });
+  input.addEventListener('focus', function() { renderSearchResults(search); });
+  input.addEventListener('keydown', function(event) {
+    var first = search.querySelector('.search-result');
+    if (event.key === 'ArrowDown' && first) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.key === 'Enter' && first) {
+      event.preventDefault();
+      chooseSearchResult(search, first);
+    } else if (event.key === 'Escape') {
+      hideSearchResults(search);
+    }
+  });
+  input.addEventListener('blur', function() {
+    setTimeout(function() {
+      if (!search.contains(document.activeElement)) hideSearchResults(search);
+    }, 100);
+  });
+  search.querySelector('select').addEventListener('change', function() { renderSearchResults(search); });
+}
+
 function resolveRoute() {
   var hash = window.location.hash.slice(1) || 'top';
   var target = document.getElementById(hash);
@@ -2353,8 +2748,16 @@ function resolveRoute() {
   requestAnimationFrame(function() {
     target.scrollIntoView({block:'start'});
     syncOverHero();
+    if (pendingTreeFocus) {
+      var focus = pendingTreeFocus;
+      pendingTreeFocus = null;
+      focusTreeCard(focus);
+    }
   });
 }
+
+document.querySelectorAll('.treewrap').forEach(initTree);
+document.querySelectorAll('.tree-search').forEach(initSearch);
 window.addEventListener('hashchange', resolveRoute);
 var heroEl = document.querySelector('#page1 .hero');
 if (heroEl && 'IntersectionObserver' in window) {
@@ -2422,7 +2825,6 @@ def build_html(
                 section,
                 content["tree"],
                 pedigree_svg,
-                family_anchor_text(family),
             )
         )
 

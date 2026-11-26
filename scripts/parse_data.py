@@ -99,9 +99,9 @@ def canonical_place(place: str) -> str:
 
 
 def format_date(value: str) -> str:
-    """Pass dates through unchanged: family.yaml stores them already
-    formatted in Russian, exactly as they are shown on the site."""
-    return (value or "").strip()
+    """Keep the stored wording, separating a glued month abbreviation and year."""
+    value = (value or "").strip()
+    return re.sub(r"(?<=[а-яё])(?=\d{4}\b)", " ", value, flags=re.IGNORECASE)
 
 
 def clean_name(value: str) -> str:
@@ -166,6 +166,7 @@ class Person:
     deat: str = ""
     deat_plac: str = ""
     deceased: bool = False
+    status: str = "ok"
     occu: str = ""
     note: str = ""
     fams: list[str] = field(default_factory=list)
@@ -271,8 +272,13 @@ class Person:
 
     @property
     def is_reconstructed(self) -> bool:
-        """Date was derived rather than recorded: treat the entry as a hypothesis."""
+        """Birth date is missing or qualified; this says nothing about identity."""
         return self.has_derived_date or not self.birt
+
+    @property
+    def is_hypothesis(self) -> bool:
+        """The archive explicitly marks the person or a relationship as a hypothesis."""
+        return self.status == "hyp"
 
 
 def year_only(date: str) -> str:
@@ -541,6 +547,7 @@ def load_family(path: Path) -> tuple[dict[str, Person], dict[str, Family], dict[
             deat=str(raw.get("death", "") or ""),
             birt_plac=str(raw.get("place", "") or ""),
             deceased=bool(raw.get("deceased", False)),
+            status=str(raw.get("status", "ok") or "ok"),
             note=str(raw.get("note", "") or ""),
             reference_year=reference_year,
         )

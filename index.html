@@ -246,7 +246,6 @@ body.over-hero .navbtn.active{color:#F0EBE3}
 .pagehead{padding:92px 0 56px}
 .pagehead h1{font-size:clamp(38px,4.8vw,60px);line-height:1.06;margin:22px 0 18px}
 .pagehead .sub{font-size:19px;color:var(--ink-2);max-width:780px}
-.pagehead .tree-family{font-size:16.5px;color:var(--ink-3);max-width:780px;margin-top:18px}
 .pagehead .stats{grid-template-columns:repeat(2,minmax(0,220px))}
 
 /* ЛЕНТА ПОКОЛЕНИЙ */
@@ -311,18 +310,36 @@ body.over-hero .navbtn.active{color:#F0EBE3}
 .src li:last-child{border-bottom:none}
 .leg{display:inline-block;background:var(--lilac-tint);color:var(--lilac);font-weight:600;border-radius:6px;padding:2px 10px;font-size:13.5px;margin-right:8px;vertical-align:1px}
 
-/* ДРЕВО — статус кодируется цветом рамки и бейджем.
-   Восемь поколений не умещаются в экран, поэтому .treewrap — двухосевой
-   скроллпорт внутри viewport: страница по горизонтали не едет
-   (body overflow-x:hidden), а древо прокручивается внутри секции.
-   max-height держит горизонтальный скроллбар в видимой области. */
-.treewrap{overflow:auto;overscroll-behavior:contain;max-height:min(85vh,920px);padding-top:26px;padding-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line-strong) var(--porcelain-deep)}
+/* ДРЕВО — самостоятельный двухосевой скроллпорт. JS меняет только размеры
+   SVG; исходный вид (100%, левый верхний угол) и вписывание разделены. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.tree-pagehead{padding:44px 0 28px}
+.tree-pagehead h1{margin:0 0 24px;font-size:clamp(34px,4vw,52px);line-height:1.1}
+.tree-toolbar{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.tree-search{position:relative;flex:1;max-width:590px;min-width:0}
+.search-fields{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:8px}
+.search-fields input,.search-fields select{min-width:0;height:38px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:14px;padding:0 11px}
+.search-fields select{max-width:190px;cursor:pointer}
+.search-results{position:absolute;z-index:30;top:44px;left:0;right:0;max-height:290px;overflow:auto;background:var(--surface);border:1px solid var(--line-strong);border-radius:6px}
+.search-results[hidden]{display:none}
+.search-result{display:flex;align-items:baseline;gap:10px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--line-soft);background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.4;text-align:left;cursor:pointer}
+.search-result:last-child{border-bottom:0}
+.search-result:hover,.search-result:focus-visible,.search-result.active{background:var(--porcelain-deep)}
+.search-result .result-name{font-weight:500}
+.search-result .result-years{color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.search-result .result-section{margin-left:auto;color:var(--lilac-deep);font-size:12px;white-space:nowrap}
+.search-empty{padding:12px;color:var(--ink-2);font-size:14px}
+.tree-controls{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.tree-controls button{height:34px;min-width:34px;padding:0 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1;cursor:pointer}
+.tree-controls button:hover{background:var(--porcelain-deep);border-color:var(--steel)}
+.tree-controls .tree-view-button{font-size:12.5px;padding:0 10px}
+.tree-controls output{width:42px;color:var(--ink-2);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}
+.treewrap{overflow:auto;overscroll-behavior:contain;max-height:min(85vh,920px);-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line-strong) var(--porcelain-deep);touch-action:none;cursor:grab;user-select:none}
+.treewrap.is-panning{cursor:grabbing}
 .treewrap::-webkit-scrollbar{height:10px;width:10px}
 .treewrap::-webkit-scrollbar-track{background:var(--porcelain-deep);border-radius:5px}
 .treewrap::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:5px}
-/* width:auto вместо 100%: иначе SVG сжимается по ширине контейнера и вместо
-   прокрутки древо уменьшается в масштабе. Ширину задаёт inline min-width,
-   который генератор пишет в render_pedigree_svg. */
+.tree-stage{position:relative;width:max-content;min-width:100%;padding:26px 36px 8px}
 .pedigree{width:auto;max-width:none;height:auto;display:block;font-family:var(--sans)}
 .pedigree .colhead{font-size:12px;letter-spacing:.04em;font-weight:600;fill:var(--ink-3)}
 .pedigree .ln{stroke:var(--line-strong);stroke-width:1.1;fill:none}
@@ -332,32 +349,29 @@ body.over-hero .navbtn.active{color:#F0EBE3}
 .pedigree .t3{font-size:10.5px;fill:var(--ink-3);font-variant-numeric:tabular-nums}
 .pedigree .bdg{font-size:10px;font-weight:500;letter-spacing:.02em}
 .pedigree .bg{stroke:none}
-.pedigree .bx{transition:opacity .15s}
-/* Есть в базе (карточка без плашки) — стальной серо-синий */
 .pedigree .bx.ok .fr{stroke:var(--steel)}
 .pedigree .bx.ok .bg{fill:var(--steel-tint)}
 .pedigree .bx.ok .bdg{fill:var(--steel-ink)}
-/* Гипотеза — приглушённая сирень */
 .pedigree .bx.hyp .fr{stroke:var(--lilac)}
 .pedigree .bx.hyp .bg{fill:var(--lilac-tint)}
 .pedigree .bx.hyp .bdg{fill:var(--lilac)}
-/* Нет данных — светлый пунктир, без подложки */
+.pedigree .bx.unknown .t3{font-style:italic;fill:var(--ink-2)}
+.pedigree .bx.approx .t3{fill:var(--lilac-deep)}
 .pedigree .bx.q .fr{fill:none;stroke:var(--line-strong);stroke-width:1;stroke-dasharray:5 4}
 .pedigree .bx.q .t1,.pedigree .bx.q .t2{fill:var(--ink-2)}
 .pedigree .bx.q .bg{fill:rgba(34,37,43,.05)}
 .pedigree .bx.q .bdg{fill:var(--ink-3)}
-/* Край прослеженной линии — плотнее рамка */
 .pedigree .bx.deep .fr{stroke-width:1.6}
-/* Семья, от которой ведётся отсчёт */
 .pedigree .bx.me .fr{fill:var(--porcelain-deep);stroke:var(--ink-3)}
 .pedigree .bx.me .t1{font-weight:700}
-.legend{display:flex;flex-wrap:wrap;gap:14px 30px;margin-top:26px;font-size:14.5px;color:var(--ink-2)}
-.legend span{display:inline-flex;align-items:center;gap:9px}
-.legend i{width:15px;height:15px;border-radius:4px;flex-shrink:0}
+.pedigree .bx.search-hit .fr{stroke:var(--lilac-deep);stroke-width:3.2}
+.legend{display:flex;flex-wrap:wrap;gap:9px 22px;margin-top:20px;font-size:13px;line-height:1.35;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;flex-shrink:0;font-style:normal;font-size:9px;line-height:1}
 .legend i.ok{background:var(--steel-tint);border:1px solid var(--steel)}
 .legend i.hyp{background:var(--lilac-tint);border:1px solid var(--lilac)}
-.legend i.q{border:1px dashed var(--line-strong)}
-.legend i.anchor{background:var(--porcelain-deep);border:1px solid var(--ink-3)}
+.legend i.q,.legend i.unknown{border:1px dashed var(--line-strong)}
+.legend i.approx{border:1px solid var(--steel);color:var(--steel-ink);width:25px}
 
 /* КАРТА ПОИСКА */
 .goalrow{display:flex;align-items:flex-start;gap:18px;padding:22px 0;border-bottom:1px solid var(--line)}
@@ -412,6 +426,10 @@ footer b{color:var(--hero-ink)}
 
 @media(max-width:980px){
   .g2,.g3{grid-template-columns:1fr}
+  .section-nav .wrap{flex-wrap:nowrap;overflow-x:auto;gap:22px;padding-top:14px;padding-bottom:14px;scrollbar-width:thin}
+  .section-nav a{white-space:nowrap;flex-shrink:0}
+  .tree-toolbar{flex-wrap:wrap}
+  .tree-search{flex-basis:100%;max-width:none}
   .place-list{grid-template-columns:1fr}
   .gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   section{padding:76px 0}
@@ -430,13 +448,13 @@ footer b{color:var(--hero-ink)}
   .pagehead .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:600px){
-  :root{--navh:56px}
+  :root{--navh:46px}
   body{font-size:17.5px}
   .wrap{padding:0 20px}
   section{padding:60px 0}
-  nav .wrap{gap:8px;padding-top:8px;padding-bottom:8px}
-  .nav-links{gap:6px 10px}
-  .navbtn{padding:6px 0;margin-left:0;font-size:10px;letter-spacing:.08em}
+  nav .wrap{gap:8px;padding-top:7px;padding-bottom:7px}
+  .nav-links{flex-wrap:nowrap;justify-content:space-between;gap:8px}
+  .navbtn{padding:5px 0;margin-left:0;font-size:9px;letter-spacing:.06em}
   .hero{padding:calc(var(--navh) + 44px) 0 min(118vw,560px)}
   .hero-grid{padding-bottom:8px}
   .hero h1::after{width:min(40vw,200px);margin-top:28px}
@@ -467,7 +485,7 @@ footer b{color:var(--hero-ink)}
   .lattice .tick{stroke-width:1}
   .about{padding:48px 0}
   .about-text{font-size:21px}
-  .section-nav .wrap{gap:9px 20px;padding-top:16px;padding-bottom:16px}
+  .section-nav .wrap{gap:20px;padding-top:11px;padding-bottom:11px}
   .section-nav a{font-size:12px}
   .collateral{margin-top:56px}
   .gallery-grid{grid-template-columns:1fr}
@@ -485,7 +503,21 @@ footer b{color:var(--hero-ink)}
   .src .scard{padding:26px 22px}
   .tl-item h3{font-size:24px}
   .goalrow .n{font-size:25px;min-width:28px}
-  .legend{gap:12px 20px;font-size:13.5px}
+  .tree-pagehead{padding:28px 0 20px}
+  .tree-pagehead h1{font-size:32px;margin-bottom:16px}
+  .tree-toolbar{gap:12px}
+  .search-fields{grid-template-columns:minmax(0,1fr) auto;gap:6px}
+  .search-fields input,.search-fields select{height:36px;font-size:12.5px;padding:0 8px}
+  .search-fields select{width:142px}
+  .search-result{flex-wrap:wrap;gap:2px 8px;padding:9px 10px;font-size:13px}
+  .search-result .result-section{margin-left:0;flex-basis:100%}
+  .tree-controls{gap:5px;width:100%}
+  .tree-controls button{height:32px;min-width:32px}
+  .tree-controls .tree-view-button{font-size:12px;padding:0 9px}
+  .tree-controls output{width:38px}
+  .treewrap{max-height:72svh}
+  .tree-stage{padding:16px 12px 8px}
+  .legend{gap:8px 14px;font-size:12px;margin-top:16px}
 }
 </style>
 </head>
@@ -664,48 +696,84 @@ footer b{color:var(--hero-ink)}
 </div>
 
 <div class="page" id="page2">
-<section class="pagehead" id="matyukhiny-tree">
-  <div class="wrap">
-    <div class="label">Генеалогическое древо</div>
-    <h1>Древо Матюхиных</h1>
-    <p class="sub">Предки Сергея по отцу и матери. Супруга и общая дочь показаны в начальной семье; предки супруги относятся к разделу «Скиба». Дальние поколения прокручиваются по горизонтали.</p>
-    <p class="tree-family">Семья: Матюхин Сергей (р. 1971) и Скиба Надежда (р. 1969); общий ребёнок Матюхина Анна (р. 2002).</p>
-  </div>
-</section>
 <div class="section-nav"><div class="wrap"><a href="#matyukhiny">Обзор</a><a href="#matyukhiny-branches">Ветви</a><a href="#matyukhiny-tree">Древо</a><a href="#matyukhiny-sources">Документы</a><a href="#matyukhiny-places">География</a><a href="#matyukhiny-timeline">Хроника</a></div></div>
 
-<section class="treewrap" tabindex="0" role="region" aria-label="Древо прямых предков">
-  <div class="wrap" style="max-width:none"><svg class="pedigree" viewBox="0 0 1972 1521" xmlns="http://www.w3.org/2000/svg" style="min-width:1972px" role="img" aria-labelledby="pedigree-title pedigree-desc"><title id="pedigree-title">Древо прямых предков</title><desc id="pedigree-desc">Предки Сергея по отцу и матери. Супруга и общая дочь показаны в начальной семье; предки супруги относятся к разделу «Скиба». Дальние поколения прокручиваются по горизонтали.</desc><text x="18" y="26" class="colhead">Семья</text><text x="260" y="26" class="colhead">Родители</text><text x="502" y="26" class="colhead">Деды и бабушки</text><text x="744" y="26" class="colhead">Прадеды</text><text x="986" y="26" class="colhead">Прапрадеды</text><text x="1228" y="26" class="colhead">Прапрапрадеды</text><text x="1470" y="26" class="colhead">Прапрапрапрадеды</text><text x="1712" y="26" class="colhead">Прапрапрапрапрадеды</text><path class="ln" d="M232 849.0 H246.0"/><path class="ln" d="M246.0 636.9 V1061.0"/><path class="ln" d="M246.0 636.9 H260"/><path class="ln" d="M474 636.9 H488.0"/><path class="ln" d="M488.0 488.9 V785.0"/><path class="ln" d="M488.0 488.9 H502"/><path class="ln" d="M716 488.9 H730.0"/><path class="ln" d="M730.0 376.8 V601.0"/><path class="ln" d="M730.0 376.8 H744"/><path class="ln" d="M958 376.8 H972.0"/><path class="ln" d="M972.0 290.5 V463.0"/><path class="ln" d="M972.0 290.5 H986"/><path class="ln" d="M1200 290.5 H1214.0"/><path class="ln" d="M1214.0 210.0 V371.0"/><path class="ln" d="M1214.0 210.0 H1228"/><path class="ln" d="M1442 210.0 H1456.0"/><path class="ln" d="M1456.0 141.0 V279.0"/><path class="ln" d="M1456.0 141.0 H1470"/><path class="ln" d="M1684 141.0 H1698.0"/><path class="ln" d="M1698.0 95.0 V187.0"/><path class="ln" d="M1698.0 95.0 H1712"/><path class="ln" d="M1698.0 187.0 H1712"/><path class="ln" d="M1456.0 279.0 H1470"/><path class="ln" d="M1214.0 371.0 H1228"/><path class="ln" d="M972.0 463.0 H986"/><path class="ln" d="M730.0 601.0 H744"/><path class="ln" d="M958 601.0 H972.0"/><path class="ln" d="M972.0 555.0 V647.0"/><path class="ln" d="M972.0 555.0 H986"/><path class="ln" d="M972.0 647.0 H986"/><path class="ln" d="M488.0 785.0 H502"/><path class="ln" d="M716 785.0 H730.0"/><path class="ln" d="M730.0 739.0 V831.0"/><path class="ln" d="M730.0 739.0 H744"/><path class="ln" d="M730.0 831.0 H744"/><path class="ln" d="M246.0 1061.0 H260"/><path class="ln" d="M474 1061.0 H488.0"/><path class="ln" d="M488.0 969.0 V1153.0"/><path class="ln" d="M488.0 969.0 H502"/><path class="ln" d="M716 969.0 H730.0"/><path class="ln" d="M730.0 923.0 V1015.0"/><path class="ln" d="M730.0 923.0 H744"/><path class="ln" d="M730.0 1015.0 H744"/><path class="ln" d="M488.0 1153.0 H502"/><path class="ln" d="M716 1153.0 H730.0"/><path class="ln" d="M730.0 1107.0 V1199.0"/><path class="ln" d="M730.0 1107.0 H744"/><path class="ln" d="M730.0 1199.0 H744"/><path class="ln" d="M12 849.0 V1429.0"/><path class="ln" d="M12 849.0 H18"/><path class="ln" d="M12 1429.0 H18"/><path class="ln" d="M12 1139.0 H18"/><g class="bx ok me"><rect class="fr" x="18" y="1100.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="1117.0">Матюхина</text><text class="t2" x="30" y="1134.0">Анна Сергеевна</text><text class="t3" x="30" y="1152.0">2002</text></g><g class="bx ok me"><rect class="fr" x="18" y="810.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="827.0">Матюхин</text><text class="t2" x="30" y="844.0">Сергей Андреевич</text><text class="t3" x="30" y="862.0">1971</text></g><g class="bx ok"><rect class="fr" x="260" y="597.9" width="214" height="78" rx="10"/><text class="t1" x="272" y="614.9">Матюхин</text><text class="t2" x="272" y="631.9">Андрей Иванович</text><text class="t3" x="272" y="649.9">1 октября 1931 – 10 мая 1996</text></g><g class="bx ok"><rect class="fr" x="502" y="449.9" width="214" height="78" rx="10"/><text class="t1" x="514" y="466.9">Матюхин</text><text class="t2" x="514" y="483.9">Иван Андреевич</text><text class="t3" x="514" y="501.9">ноя. 1892 – 1971</text></g><g class="bx ok"><rect class="fr" x="744" y="337.8" width="214" height="78" rx="10"/><text class="t1" x="756" y="354.8">Матюхин</text><text class="t2" x="756" y="371.8">Андрей Федотович</text><text class="t3" x="756" y="389.8">1870</text></g><g class="bx hyp"><rect class="fr" x="986" y="251.5" width="214" height="78" rx="10"/><text class="t1" x="998" y="268.5">Федот</text><text class="t2" x="998" y="285.5"></text><text class="t3" x="998" y="303.5">ок. 1818</text><rect class="bg" x="998" y="308.5" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="319.9" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="1228" y="171.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="188.0">Григорий</text><text class="t2" x="1240" y="205.0"></text><text class="t3" x="1240" y="223.0">ок. 1790</text><rect class="bg" x="1240" y="228.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1277.0" y="239.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="1470" y="102.0" width="214" height="78" rx="10"/><text class="t1" x="1482" y="119.0">Илья</text><text class="t2" x="1482" y="136.0"></text><text class="t3" x="1482" y="154.0">ок. 1768</text><rect class="bg" x="1482" y="159.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1519.0" y="170.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="1712" y="56.0" width="214" height="78" rx="10"/><text class="t1" x="1724" y="73.0">Матвей</text><text class="t2" x="1724" y="90.0"></text><text class="t3" x="1724" y="108.0"></text><rect class="bg" x="1724" y="113.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1761.0" y="124.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="1712" y="148.0" width="214" height="78" rx="10"/><text class="t1" x="1724" y="165.0">—</text><text class="t2" x="1724" y="182.0">мать не найдена</text><rect class="bg" x="1724" y="205.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1767.0" y="216.4" text-anchor="middle">Нет данных</text></g><g class="bx hyp"><rect class="fr" x="1470" y="240.0" width="214" height="78" rx="10"/><text class="t1" x="1482" y="257.0">Аграфена</text><text class="t2" x="1482" y="274.0"></text><text class="t3" x="1482" y="292.0">ок. 1771</text><rect class="bg" x="1482" y="297.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1519.0" y="308.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="1228" y="332.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="349.0">Степанида</text><text class="t2" x="1240" y="366.0"></text><text class="t3" x="1240" y="384.0">ок. 1791</text><rect class="bg" x="1240" y="389.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1277.0" y="400.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="424.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="441.0">—</text><text class="t2" x="998" y="458.0">мать не найдена</text><rect class="bg" x="998" y="481.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="492.4" text-anchor="middle">Нет данных</text></g><g class="bx ok"><rect class="fr" x="744" y="562.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="579.0">Горелова</text><text class="t2" x="756" y="596.0">Мария Федоровна</text><text class="t3" x="756" y="614.0">1871</text></g><g class="bx hyp"><rect class="fr" x="986" y="516.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="533.0">Горелов</text><text class="t2" x="998" y="550.0">Федор</text><text class="t3" x="998" y="568.0"></text><rect class="bg" x="998" y="573.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="584.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="608.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="625.0">—</text><text class="t2" x="998" y="642.0">мать не найдена</text><rect class="bg" x="998" y="665.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="676.4" text-anchor="middle">Нет данных</text></g><g class="bx ok"><rect class="fr" x="502" y="746.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="763.0">Алексанова</text><text class="t2" x="514" y="780.0">Прасковья Власовна</text><text class="t3" x="514" y="798.0">1892 – 1969</text></g><g class="bx hyp"><rect class="fr" x="744" y="700.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="717.0">Алексанов</text><text class="t2" x="756" y="734.0">Влас</text><text class="t3" x="756" y="752.0">до 1874</text><rect class="bg" x="756" y="757.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="768.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="744" y="792.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="809.0">—</text><text class="t2" x="756" y="826.0">мать не найдена</text><rect class="bg" x="756" y="849.0" width="86" height="16" rx="8.0"/><text class="bdg" x="799.0" y="860.4" text-anchor="middle">Нет данных</text></g><g class="bx ok"><rect class="fr" x="260" y="1022.0" width="214" height="78" rx="10"/><text class="t1" x="272" y="1039.0">Астафьева</text><text class="t2" x="272" y="1056.0">Надежда Алексеевна</text><text class="t3" x="272" y="1074.0">22 августа 1931 – 4 декабря 1997</text></g><g class="bx hyp"><rect class="fr" x="502" y="930.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="947.0">Астафьев</text><text class="t2" x="514" y="964.0">Алексей Петрович</text><text class="t3" x="514" y="982.0">до 1898 – 22 августа 1972</text><rect class="bg" x="514" y="987.0" width="74" height="16" rx="8.0"/><text class="bdg" x="551.0" y="998.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="744" y="884.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="901.0">Астафьев</text><text class="t2" x="756" y="918.0">Петр</text><text class="t3" x="756" y="936.0"></text><rect class="bg" x="756" y="941.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="952.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="744" y="976.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="993.0">—</text><text class="t2" x="756" y="1010.0">мать не найдена</text><rect class="bg" x="756" y="1033.0" width="86" height="16" rx="8.0"/><text class="bdg" x="799.0" y="1044.4" text-anchor="middle">Нет данных</text></g><g class="bx hyp"><rect class="fr" x="502" y="1114.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="1131.0">Мария Архиповна</text><text class="t2" x="514" y="1148.0"></text><text class="t3" x="514" y="1166.0">† зима 1961</text><rect class="bg" x="514" y="1171.0" width="74" height="16" rx="8.0"/><text class="bdg" x="551.0" y="1182.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="744" y="1068.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1085.0">Архип</text><text class="t2" x="756" y="1102.0"></text><text class="t3" x="756" y="1120.0"></text><rect class="bg" x="756" y="1125.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="1136.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="744" y="1160.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1177.0">—</text><text class="t2" x="756" y="1194.0">мать не найдена</text><rect class="bg" x="756" y="1217.0" width="86" height="16" rx="8.0"/><text class="bdg" x="799.0" y="1228.4" text-anchor="middle">Нет данных</text></g><g class="bx ok me"><rect class="fr" x="18" y="1390.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="1407.0">Скиба</text><text class="t2" x="30" y="1424.0">Надежда Эдуардовна</text><text class="t3" x="30" y="1442.0">1969</text></g></svg>
-    <div class="legend">
-      <span>Запись в семейной базе — не документальное подтверждение</span>
-      <span><i class="hyp"></i>Гипотеза — дата вычислена или отсутствует</span>
-      <span><i class="q"></i>Предок не найден</span>
-      <span><i class="anchor"></i>Семья, от которой ведётся отсчёт</span>
+<section class="pagehead tree-pagehead" id="matyukhiny-tree">
+  <div class="wrap">
+    <h1>Древо Матюхиных</h1>
+    <div class="tree-toolbar">
+      <div class="tree-search" data-search-tree="matyukhiny">
+        <label class="sr-only" for="search-matyukhiny">Поиск по людям на древе</label>
+        <div class="search-fields">
+          <input id="search-matyukhiny" type="search" placeholder="Фамилия, имя или отчество" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="results-matyukhiny">
+          <label class="sr-only" for="scope-matyukhiny">Область поиска</label>
+          <select id="scope-matyukhiny" aria-label="Область поиска">
+            <option value="local">Это древо</option>
+            <option value="global">Весь публичный архив</option>
+          </select>
+        </div>
+        <div class="search-results" id="results-matyukhiny" role="listbox" aria-label="Поиск по людям на древе" hidden></div>
+      </div>
+      <div class="tree-controls" data-controls-tree="matyukhiny" role="group" aria-label="Масштаб древа">
+        <button type="button" data-tree-action="zoom-out" aria-label="Уменьшить древо" title="Уменьшить древо">−</button>
+        <output data-zoom-value aria-live="polite" aria-label="Текущий масштаб">100%</output>
+        <button type="button" data-tree-action="zoom-in" aria-label="Увеличить древо" title="Увеличить древо">+</button>
+        <button type="button" class="tree-view-button" data-tree-action="fit">Показать всё</button>
+        <button type="button" class="tree-view-button" data-tree-action="reset">Исходный вид</button>
+      </div>
+    </div>
+    <div class="legend" aria-label="Условные обозначения">
+      <span><i class="unknown" aria-hidden="true">?</i>Дата неизвестна</span>
+      <span><i class="approx" aria-hidden="true">ок.</i>Приблизительная дата (ок., до, после, между)</span>
+      <span><i class="ok" aria-hidden="true"></i>Сведения из семейных материалов</span>
+      <span><i class="hyp" aria-hidden="true"></i>Гипотеза о личности или родственной связи</span>
+      <span><i class="q" aria-hidden="true"></i>Родственник не найден</span>
     </div>
   </div>
+</section>
+<section class="treewrap" tabindex="0" role="region" aria-label="Древо Матюхиных" data-tree="matyukhiny" data-section-title="Матюхины" data-no-results="На публичных древах ничего не найдено">
+  <div class="tree-stage"><svg class="pedigree" viewBox="0 0 1972 1521" width="1972" height="1521" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pedigree-title pedigree-desc"><title id="pedigree-title">Древо прямых предков</title><desc id="pedigree-desc">Предки Сергея по отцу и матери. Супруга и общая дочь показаны в начальной семье; предки супруги относятся к разделу «Скиба». Дальние поколения прокручиваются по горизонтали.</desc><text x="18" y="26" class="colhead">Семья</text><text x="260" y="26" class="colhead">Родители</text><text x="502" y="26" class="colhead">Деды и бабушки</text><text x="744" y="26" class="colhead">Прадеды</text><text x="986" y="26" class="colhead">Прапрадеды</text><text x="1228" y="26" class="colhead">Прапрапрадеды</text><text x="1470" y="26" class="colhead">Прапрапрапрадеды</text><text x="1712" y="26" class="colhead">Прапрапрапрапрадеды</text><path class="ln" d="M232 849.0 H246.0"/><path class="ln" d="M246.0 636.9 V1061.0"/><path class="ln" d="M246.0 636.9 H260"/><path class="ln" d="M474 636.9 H488.0"/><path class="ln" d="M488.0 488.9 V785.0"/><path class="ln" d="M488.0 488.9 H502"/><path class="ln" d="M716 488.9 H730.0"/><path class="ln" d="M730.0 376.8 V601.0"/><path class="ln" d="M730.0 376.8 H744"/><path class="ln" d="M958 376.8 H972.0"/><path class="ln" d="M972.0 290.5 V463.0"/><path class="ln" d="M972.0 290.5 H986"/><path class="ln" d="M1200 290.5 H1214.0"/><path class="ln" d="M1214.0 210.0 V371.0"/><path class="ln" d="M1214.0 210.0 H1228"/><path class="ln" d="M1442 210.0 H1456.0"/><path class="ln" d="M1456.0 141.0 V279.0"/><path class="ln" d="M1456.0 141.0 H1470"/><path class="ln" d="M1684 141.0 H1698.0"/><path class="ln" d="M1698.0 95.0 V187.0"/><path class="ln" d="M1698.0 95.0 H1712"/><path class="ln" d="M1698.0 187.0 H1712"/><path class="ln" d="M1456.0 279.0 H1470"/><path class="ln" d="M1214.0 371.0 H1228"/><path class="ln" d="M972.0 463.0 H986"/><path class="ln" d="M730.0 601.0 H744"/><path class="ln" d="M958 601.0 H972.0"/><path class="ln" d="M972.0 555.0 V647.0"/><path class="ln" d="M972.0 555.0 H986"/><path class="ln" d="M972.0 647.0 H986"/><path class="ln" d="M488.0 785.0 H502"/><path class="ln" d="M716 785.0 H730.0"/><path class="ln" d="M730.0 739.0 V831.0"/><path class="ln" d="M730.0 739.0 H744"/><path class="ln" d="M730.0 831.0 H744"/><path class="ln" d="M246.0 1061.0 H260"/><path class="ln" d="M474 1061.0 H488.0"/><path class="ln" d="M488.0 969.0 V1153.0"/><path class="ln" d="M488.0 969.0 H502"/><path class="ln" d="M716 969.0 H730.0"/><path class="ln" d="M730.0 923.0 V1015.0"/><path class="ln" d="M730.0 923.0 H744"/><path class="ln" d="M730.0 1015.0 H744"/><path class="ln" d="M488.0 1153.0 H502"/><path class="ln" d="M716 1153.0 H730.0"/><path class="ln" d="M730.0 1107.0 V1199.0"/><path class="ln" d="M730.0 1107.0 H744"/><path class="ln" d="M730.0 1199.0 H744"/><path class="ln" d="M12 849.0 V1429.0"/><path class="ln" d="M12 849.0 H18"/><path class="ln" d="M12 1429.0 H18"/><path class="ln" d="M12 1139.0 H18"/><g id="pedigree-p02" class="bx ok me" data-person-id="p02" data-search="Анна Сергеевна | Анна Сергеевна Матюхина | Матюхин | Матюхина | Матюхина Анна Сергеевна" data-years="р. 2002"><rect class="fr" x="18" y="1100.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="1117.0">Матюхина</text><text class="t2" x="30" y="1134.0">Анна Сергеевна</text><text class="t3" x="30" y="1152.0">2002</text></g><g id="pedigree-p01" class="bx ok me" data-person-id="p01" data-search="Матюхин | Матюхин Сергей Андреевич | Матюхина | Сергей Андреевич | Сергей Андреевич Матюхин" data-years="р. 1971"><rect class="fr" x="18" y="810.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="827.0">Матюхин</text><text class="t2" x="30" y="844.0">Сергей Андреевич</text><text class="t3" x="30" y="862.0">1971</text></g><g id="pedigree-p04" class="bx ok" data-person-id="p04" data-search="Андрей Иванович | Андрей Иванович Матюхин | Матюхин | Матюхин Андрей Иванович | Матюхина" data-years="1 октября 1931 – 10 мая 1996"><rect class="fr" x="260" y="597.9" width="214" height="78" rx="10"/><text class="t1" x="272" y="614.9">Матюхин</text><text class="t2" x="272" y="631.9">Андрей Иванович</text><text class="t3" x="272" y="649.9">1 октября 1931 – 10 мая 1996</text></g><g id="pedigree-p08" class="bx ok" data-person-id="p08" data-search="Иван Андреевич | Иван Андреевич Матюхин | Матюхин | Матюхин Иван Андреевич | Матюхина" data-years="ноя. 1892 – 1971"><rect class="fr" x="502" y="449.9" width="214" height="78" rx="10"/><text class="t1" x="514" y="466.9">Матюхин</text><text class="t2" x="514" y="483.9">Иван Андреевич</text><text class="t3" x="514" y="501.9">ноя. 1892 – 1971</text></g><g id="pedigree-p16" class="bx ok" data-person-id="p16" data-search="Андрей Федотович | Андрей Федотович Матюхин | Матюхин | Матюхин Андрей Федотович | Матюхина" data-years="р. 1870"><rect class="fr" x="744" y="337.8" width="214" height="78" rx="10"/><text class="t1" x="756" y="354.8">Матюхин</text><text class="t2" x="756" y="371.8">Андрей Федотович</text><text class="t3" x="756" y="389.8">1870</text></g><g id="pedigree-p29" class="bx hyp approx" data-person-id="p29" data-search="Федот" data-years="р. ок. 1818"><rect class="fr" x="986" y="251.5" width="214" height="78" rx="10"/><text class="t1" x="998" y="268.5">Федот</text><text class="t2" x="998" y="285.5"></text><text class="t3" x="998" y="303.5">ок. 1818</text><rect class="bg" x="998" y="308.5" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="319.9" text-anchor="middle">Гипотеза</text></g><g id="pedigree-p39" class="bx hyp approx" data-person-id="p39" data-search="Григорий" data-years="р. ок. 1790"><rect class="fr" x="1228" y="171.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="188.0">Григорий</text><text class="t2" x="1240" y="205.0"></text><text class="t3" x="1240" y="223.0">ок. 1790</text><rect class="bg" x="1240" y="228.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1277.0" y="239.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-p42" class="bx hyp approx" data-person-id="p42" data-search="Илья" data-years="р. ок. 1768"><rect class="fr" x="1470" y="102.0" width="214" height="78" rx="10"/><text class="t1" x="1482" y="119.0">Илья</text><text class="t2" x="1482" y="136.0"></text><text class="t3" x="1482" y="154.0">ок. 1768</text><rect class="bg" x="1482" y="159.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1519.0" y="170.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-p44" class="bx hyp deep unknown" data-person-id="p44" data-search="Матвей" data-years="? – ?"><rect class="fr" x="1712" y="56.0" width="214" height="78" rx="10"/><text class="t1" x="1724" y="73.0">Матвей</text><text class="t2" x="1724" y="90.0"></text><text class="t3" x="1724" y="108.0">даты неизвестны</text><rect class="bg" x="1724" y="113.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1761.0" y="124.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="1712" y="148.0" width="214" height="78" rx="10"/><text class="t1" x="1724" y="165.0">—</text><text class="t2" x="1724" y="182.0">мать не найдена</text><rect class="bg" x="1724" y="205.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1767.0" y="216.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-p43" class="bx hyp deep approx" data-person-id="p43" data-search="Аграфена" data-years="р. ок. 1771"><rect class="fr" x="1470" y="240.0" width="214" height="78" rx="10"/><text class="t1" x="1482" y="257.0">Аграфена</text><text class="t2" x="1482" y="274.0"></text><text class="t3" x="1482" y="292.0">ок. 1771</text><rect class="bg" x="1482" y="297.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1519.0" y="308.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-p40" class="bx hyp deep approx" data-person-id="p40" data-search="Степанида" data-years="р. ок. 1791"><rect class="fr" x="1228" y="332.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="349.0">Степанида</text><text class="t2" x="1240" y="366.0"></text><text class="t3" x="1240" y="384.0">ок. 1791</text><rect class="bg" x="1240" y="389.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1277.0" y="400.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="424.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="441.0">—</text><text class="t2" x="998" y="458.0">мать не найдена</text><rect class="bg" x="998" y="481.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="492.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-p17" class="bx ok" data-person-id="p17" data-search="Горелов | Горелова | Горелова Мария Федоровна | Мария Федоровна | Мария Федоровна Горелова" data-years="р. 1871"><rect class="fr" x="744" y="562.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="579.0">Горелова</text><text class="t2" x="756" y="596.0">Мария Федоровна</text><text class="t3" x="756" y="614.0">1871</text></g><g id="pedigree-p30" class="bx hyp deep unknown" data-person-id="p30" data-search="Горелов | Горелов Федор | Горелова | Федор | Федор Горелов" data-years="? – ?"><rect class="fr" x="986" y="516.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="533.0">Горелов</text><text class="t2" x="998" y="550.0">Федор</text><text class="t3" x="998" y="568.0">даты неизвестны</text><rect class="bg" x="998" y="573.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="584.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="608.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="625.0">—</text><text class="t2" x="998" y="642.0">мать не найдена</text><rect class="bg" x="998" y="665.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="676.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-p09" class="bx ok" data-person-id="p09" data-search="Алексанов | Алексанова | Алексанова Прасковья Власовна | Прасковья Власовна | Прасковья Власовна Алексанова" data-years="1892 – 1969"><rect class="fr" x="502" y="746.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="763.0">Алексанова</text><text class="t2" x="514" y="780.0">Прасковья Власовна</text><text class="t3" x="514" y="798.0">1892 – 1969</text></g><g id="pedigree-p18" class="bx hyp deep approx" data-person-id="p18" data-search="Алексанов | Алексанов Влас | Алексанова | Влас | Влас Алексанов" data-years="р. до 1874"><rect class="fr" x="744" y="700.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="717.0">Алексанов</text><text class="t2" x="756" y="734.0">Влас</text><text class="t3" x="756" y="752.0">до 1874</text><rect class="bg" x="756" y="757.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="768.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="744" y="792.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="809.0">—</text><text class="t2" x="756" y="826.0">мать не найдена</text><rect class="bg" x="756" y="849.0" width="86" height="16" rx="8.0"/><text class="bdg" x="799.0" y="860.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-p05" class="bx ok" data-person-id="p05" data-search="Астафьев | Астафьева | Астафьева Надежда Алексеевна | Надежда Алексеевна | Надежда Алексеевна Астафьева" data-years="22 августа 1931 – 4 декабря 1997"><rect class="fr" x="260" y="1022.0" width="214" height="78" rx="10"/><text class="t1" x="272" y="1039.0">Астафьева</text><text class="t2" x="272" y="1056.0">Надежда Алексеевна</text><text class="t3" x="272" y="1074.0">22 августа 1931 – 4 декабря 1997</text></g><g id="pedigree-p10" class="bx hyp approx" data-person-id="p10" data-search="Алексей Петрович | Алексей Петрович Астафьев | Астафьев | Астафьев Алексей Петрович | Астафьева" data-years="до 1898 – 22 августа 1972"><rect class="fr" x="502" y="930.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="947.0">Астафьев</text><text class="t2" x="514" y="964.0">Алексей Петрович</text><text class="t3" x="514" y="982.0">до 1898 – 22 августа 1972</text><rect class="bg" x="514" y="987.0" width="74" height="16" rx="8.0"/><text class="bdg" x="551.0" y="998.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-p19" class="bx hyp deep unknown" data-person-id="p19" data-search="Астафьев | Астафьев Петр | Астафьева | Петр | Петр Астафьев" data-years="? – ?"><rect class="fr" x="744" y="884.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="901.0">Астафьев</text><text class="t2" x="756" y="918.0">Петр</text><text class="t3" x="756" y="936.0">даты неизвестны</text><rect class="bg" x="756" y="941.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="952.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="744" y="976.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="993.0">—</text><text class="t2" x="756" y="1010.0">мать не найдена</text><rect class="bg" x="756" y="1033.0" width="86" height="16" rx="8.0"/><text class="bdg" x="799.0" y="1044.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-p11" class="bx hyp" data-person-id="p11" data-search="Мария Архиповна" data-years="ум. зима 1961"><rect class="fr" x="502" y="1114.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="1131.0">Мария Архиповна</text><text class="t2" x="514" y="1148.0"></text><text class="t3" x="514" y="1166.0">† зима 1961</text><rect class="bg" x="514" y="1171.0" width="74" height="16" rx="8.0"/><text class="bdg" x="551.0" y="1182.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-p20" class="bx hyp deep unknown" data-person-id="p20" data-search="Архип" data-years="? – ?"><rect class="fr" x="744" y="1068.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1085.0">Архип</text><text class="t2" x="756" y="1102.0"></text><text class="t3" x="756" y="1120.0">даты неизвестны</text><rect class="bg" x="756" y="1125.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="1136.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="744" y="1160.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1177.0">—</text><text class="t2" x="756" y="1194.0">мать не найдена</text><rect class="bg" x="756" y="1217.0" width="86" height="16" rx="8.0"/><text class="bdg" x="799.0" y="1228.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-p03" class="bx ok me" data-person-id="p03" data-search="Надежда Эдуардовна | Надежда Эдуардовна Скиба | Скиба | Скиба Надежда Эдуардовна" data-years="р. 1969"><rect class="fr" x="18" y="1390.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="1407.0">Скиба</text><text class="t2" x="30" y="1424.0">Надежда Эдуардовна</text><text class="t3" x="30" y="1442.0">1969</text></g></svg></div>
 </section>
 </div>
 
 <div class="page" id="page3">
-<section class="pagehead" id="skiba-tree">
-  <div class="wrap">
-    <div class="label">Генеалогическое древо</div>
-    <h1>Древо Скиба</h1>
-    <p class="sub">Предки Надежды по отцу и матери. Супруг и общая дочь показаны в начальной семье; предки супруга относятся к разделу «Матюхины». Дальние поколения прокручиваются по горизонтали.</p>
-    <p class="tree-family">Семья: Матюхин Сергей (р. 1971) и Скиба Надежда (р. 1969); общий ребёнок Матюхина Анна (р. 2002).</p>
-  </div>
-</section>
 <div class="section-nav"><div class="wrap"><a href="#skiba">Обзор</a><a href="#skiba-branches">Ветви</a><a href="#skiba-tree">Древо</a><a href="#skiba-sources">Документы</a><a href="#skiba-places">География</a><a href="#skiba-timeline">Хроника</a></div></div>
 
-<section class="treewrap" tabindex="0" role="region" aria-label="Древо прямых предков">
-  <div class="wrap" style="max-width:none"><svg class="pedigree" viewBox="0 0 1972 1613" xmlns="http://www.w3.org/2000/svg" style="min-width:1972px" role="img" aria-labelledby="pedigree-skiba-title pedigree-skiba-desc"><title id="pedigree-skiba-title">Древо прямых предков</title><desc id="pedigree-skiba-desc">Предки Надежды по отцу и матери. Супруг и общая дочь показаны в начальной семье; предки супруга относятся к разделу «Матюхины». Дальние поколения прокручиваются по горизонтали.</desc><text x="18" y="26" class="colhead">Семья</text><text x="260" y="26" class="colhead">Родители</text><text x="502" y="26" class="colhead">Деды и бабушки</text><text x="744" y="26" class="colhead">Прадеды</text><text x="986" y="26" class="colhead">Прапрадеды</text><text x="1228" y="26" class="colhead">Прапрапрадеды</text><text x="1470" y="26" class="colhead">Прапрапрапрадеды</text><text x="1712" y="26" class="colhead">Прапрапрапрапрадеды</text><path class="ln" d="M232 684.4 H246.0"/><path class="ln" d="M246.0 405.5 V963.2"/><path class="ln" d="M246.0 405.5 H260"/><path class="ln" d="M474 405.5 H488.0"/><path class="ln" d="M488.0 233.0 V578.0"/><path class="ln" d="M488.0 233.0 H502"/><path class="ln" d="M716 233.0 H730.0"/><path class="ln" d="M730.0 141.0 V325.0"/><path class="ln" d="M730.0 141.0 H744"/><path class="ln" d="M958 141.0 H972.0"/><path class="ln" d="M972.0 95.0 V187.0"/><path class="ln" d="M972.0 95.0 H986"/><path class="ln" d="M972.0 187.0 H986"/><path class="ln" d="M730.0 325.0 H744"/><path class="ln" d="M958 325.0 H972.0"/><path class="ln" d="M972.0 279.0 V371.0"/><path class="ln" d="M972.0 279.0 H986"/><path class="ln" d="M972.0 371.0 H986"/><path class="ln" d="M488.0 578.0 H502"/><path class="ln" d="M716 578.0 H730.0"/><path class="ln" d="M730.0 509.0 V647.0"/><path class="ln" d="M730.0 509.0 H744"/><path class="ln" d="M958 509.0 H972.0"/><path class="ln" d="M972.0 463.0 V555.0"/><path class="ln" d="M972.0 463.0 H986"/><path class="ln" d="M972.0 555.0 H986"/><path class="ln" d="M730.0 647.0 H744"/><path class="ln" d="M246.0 963.2 H260"/><path class="ln" d="M474 963.2 H488.0"/><path class="ln" d="M488.0 785.0 V1141.5"/><path class="ln" d="M488.0 785.0 H502"/><path class="ln" d="M716 785.0 H730.0"/><path class="ln" d="M730.0 739.0 V831.0"/><path class="ln" d="M730.0 739.0 H744"/><path class="ln" d="M730.0 831.0 H744"/><path class="ln" d="M488.0 1141.5 H502"/><path class="ln" d="M716 1141.5 H730.0"/><path class="ln" d="M730.0 1038.0 V1245.0"/><path class="ln" d="M730.0 1038.0 H744"/><path class="ln" d="M958 1038.0 H972.0"/><path class="ln" d="M972.0 969.0 V1107.0"/><path class="ln" d="M972.0 969.0 H986"/><path class="ln" d="M1200 969.0 H1214.0"/><path class="ln" d="M1214.0 923.0 V1015.0"/><path class="ln" d="M1214.0 923.0 H1228"/><path class="ln" d="M1214.0 1015.0 H1228"/><path class="ln" d="M972.0 1107.0 H986"/><path class="ln" d="M730.0 1245.0 H744"/><path class="ln" d="M958 1245.0 H972.0"/><path class="ln" d="M972.0 1199.0 V1291.0"/><path class="ln" d="M972.0 1199.0 H986"/><path class="ln" d="M972.0 1291.0 H986"/><path class="ln" d="M12 684.4 V1521.0"/><path class="ln" d="M12 684.4 H18"/><path class="ln" d="M12 1521.0 H18"/><path class="ln" d="M12 1102.7 H18"/><g class="bx ok me"><rect class="fr" x="18" y="1063.7" width="214" height="78" rx="10"/><text class="t1" x="30" y="1080.7">Матюхина</text><text class="t2" x="30" y="1097.7">Анна Сергеевна</text><text class="t3" x="30" y="1115.7">2002</text></g><g class="bx ok me"><rect class="fr" x="18" y="645.4" width="214" height="78" rx="10"/><text class="t1" x="30" y="662.4">Скиба</text><text class="t2" x="30" y="679.4">Надежда Эдуардовна</text><text class="t3" x="30" y="697.4">1969</text></g><g class="bx ok"><rect class="fr" x="260" y="366.5" width="214" height="78" rx="10"/><text class="t1" x="272" y="383.5">Скиба</text><text class="t2" x="272" y="400.5">Эдуард Алексеевич</text><text class="t3" x="272" y="418.5">19 февраля 1937 – 25 мая 2015</text></g><g class="bx ok"><rect class="fr" x="502" y="194.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="211.0">Скиба</text><text class="t2" x="514" y="228.0">Алексей Григорьевич</text><text class="t3" x="514" y="246.0">10 апреля 1907 – 13 октября 1955</text></g><g class="bx ok"><rect class="fr" x="744" y="102.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="119.0">Скиба</text><text class="t2" x="756" y="136.0">Григорий Андреевич</text><text class="t3" x="756" y="154.0">1879 – после 7 января 1956</text></g><g class="bx hyp"><rect class="fr" x="986" y="56.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="73.0">Скиба</text><text class="t2" x="998" y="90.0">Андрей Степанович</text><text class="t3" x="998" y="108.0">† 1891</text><rect class="bg" x="998" y="113.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="124.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="986" y="148.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="165.0">Пелагея Васильевна</text><text class="t2" x="998" y="182.0"></text><text class="t3" x="998" y="200.0">† 1937</text><rect class="bg" x="998" y="205.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="216.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="744" y="286.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="303.0">Захарченкова(Захарченко?)</text><text class="t2" x="756" y="320.0">Зинаида Агеевна</text><text class="t3" x="756" y="338.0"></text><rect class="bg" x="756" y="343.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="354.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="986" y="240.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="257.0">Захарченко</text><text class="t2" x="998" y="274.0">Агей Никифорович</text><text class="t3" x="998" y="292.0">† 1921</text><rect class="bg" x="998" y="297.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="308.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="986" y="332.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="349.0">Ульяна Васильевна</text><text class="t2" x="998" y="366.0"></text><text class="t3" x="998" y="384.0">† 1947</text><rect class="bg" x="998" y="389.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="400.4" text-anchor="middle">Гипотеза</text></g><g class="bx ok"><rect class="fr" x="502" y="539.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="556.0">Алексеева</text><text class="t2" x="514" y="573.0">Маргарита Васильевна</text><text class="t3" x="514" y="591.0">8 сентября 1909 – 19 июля 1987</text></g><g class="bx ok"><rect class="fr" x="744" y="470.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="487.0">Алексеев</text><text class="t2" x="756" y="504.0">Василий Васильевич</text><text class="t3" x="756" y="522.0">1875 – 1935</text></g><g class="bx hyp"><rect class="fr" x="986" y="424.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="441.0">Алексеев</text><text class="t2" x="998" y="458.0">Василий</text><text class="t3" x="998" y="476.0"></text><rect class="bg" x="998" y="481.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="492.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="516.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="533.0">—</text><text class="t2" x="998" y="550.0">мать не найдена</text><rect class="bg" x="998" y="573.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="584.4" text-anchor="middle">Нет данных</text></g><g class="bx ok deep"><rect class="fr" x="744" y="608.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="625.0">Агафья Андреевна</text><text class="t2" x="756" y="642.0"></text><text class="t3" x="756" y="660.0">1880 – 1944</text></g><g class="bx ok"><rect class="fr" x="260" y="924.2" width="214" height="78" rx="10"/><text class="t1" x="272" y="941.2">Поташкина</text><text class="t2" x="272" y="958.2">Нина Федоровна</text><text class="t3" x="272" y="976.2">11 июня 1938 – 23 апреля 2000</text></g><g class="bx ok"><rect class="fr" x="502" y="746.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="763.0">Поташкин</text><text class="t2" x="514" y="780.0">Федор Георгиевич</text><text class="t3" x="514" y="798.0">23 февраля 1904 – 11 января 1970</text></g><g class="bx hyp"><rect class="fr" x="744" y="700.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="717.0">Поташкин</text><text class="t2" x="756" y="734.0">Георгий</text><text class="t3" x="756" y="752.0">† ма1919</text><rect class="bg" x="756" y="757.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="768.4" text-anchor="middle">Гипотеза</text></g><g class="bx hyp"><rect class="fr" x="744" y="792.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="809.0">Дарья</text><text class="t2" x="756" y="826.0"></text><text class="t3" x="756" y="844.0"></text><rect class="bg" x="756" y="849.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="860.4" text-anchor="middle">Гипотеза</text></g><g class="bx ok"><rect class="fr" x="502" y="1102.5" width="214" height="78" rx="10"/><text class="t1" x="514" y="1119.5">Алексеева</text><text class="t2" x="514" y="1136.5">Серафима Григорьевна</text><text class="t3" x="514" y="1154.5">11 августа 1912 – 26 июля 1988</text></g><g class="bx ok"><rect class="fr" x="744" y="999.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1016.0">Захаров/Алексеев</text><text class="t2" x="756" y="1033.0">Григорий Спиридонович</text><text class="t3" x="756" y="1051.0">23 января 1887 – 16 ноября 1966</text></g><g class="bx ok"><rect class="fr" x="986" y="930.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="947.0">Захаров</text><text class="t2" x="998" y="964.0">Спиридон Ермилович(Ермолаевич)</text><text class="t3" x="998" y="982.0">1861</text></g><g class="bx hyp"><rect class="fr" x="1228" y="884.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="901.0">Захаров</text><text class="t2" x="1240" y="918.0">Ермил(а)/Ермолай</text><text class="t3" x="1240" y="936.0">до 1845</text><rect class="bg" x="1240" y="941.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1277.0" y="952.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="1228" y="976.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="993.0">—</text><text class="t2" x="1240" y="1010.0">мать не найдена</text><rect class="bg" x="1240" y="1033.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1283.0" y="1044.4" text-anchor="middle">Нет данных</text></g><g class="bx ok deep"><rect class="fr" x="986" y="1068.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="1085.0">Елизавета Николаевна</text><text class="t2" x="998" y="1102.0"></text><text class="t3" x="998" y="1120.0">1864</text></g><g class="bx ok"><rect class="fr" x="744" y="1206.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1223.0">Елисеева</text><text class="t2" x="756" y="1240.0">Зинаида Петровна</text><text class="t3" x="756" y="1258.0">8 ноября 1888 – 25 февраля 1973</text></g><g class="bx hyp"><rect class="fr" x="986" y="1160.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="1177.0">Елисеев</text><text class="t2" x="998" y="1194.0">Петр</text><text class="t3" x="998" y="1212.0"></text><rect class="bg" x="998" y="1217.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="1228.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="1252.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="1269.0">—</text><text class="t2" x="998" y="1286.0">мать не найдена</text><rect class="bg" x="998" y="1309.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="1320.4" text-anchor="middle">Нет данных</text></g><g class="bx ok me"><rect class="fr" x="18" y="1482.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="1499.0">Матюхин</text><text class="t2" x="30" y="1516.0">Сергей Андреевич</text><text class="t3" x="30" y="1534.0">1971</text></g></svg>
-    <div class="legend">
-      <span>Запись в семейной базе — не документальное подтверждение</span>
-      <span><i class="hyp"></i>Гипотеза — дата вычислена или отсутствует</span>
-      <span><i class="q"></i>Предок не найден</span>
-      <span><i class="anchor"></i>Семья, от которой ведётся отсчёт</span>
+<section class="pagehead tree-pagehead" id="skiba-tree">
+  <div class="wrap">
+    <h1>Древо Скиба</h1>
+    <div class="tree-toolbar">
+      <div class="tree-search" data-search-tree="skiba">
+        <label class="sr-only" for="search-skiba">Поиск по людям на древе</label>
+        <div class="search-fields">
+          <input id="search-skiba" type="search" placeholder="Фамилия, имя или отчество" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="results-skiba">
+          <label class="sr-only" for="scope-skiba">Область поиска</label>
+          <select id="scope-skiba" aria-label="Область поиска">
+            <option value="local">Это древо</option>
+            <option value="global">Весь публичный архив</option>
+          </select>
+        </div>
+        <div class="search-results" id="results-skiba" role="listbox" aria-label="Поиск по людям на древе" hidden></div>
+      </div>
+      <div class="tree-controls" data-controls-tree="skiba" role="group" aria-label="Масштаб древа">
+        <button type="button" data-tree-action="zoom-out" aria-label="Уменьшить древо" title="Уменьшить древо">−</button>
+        <output data-zoom-value aria-live="polite" aria-label="Текущий масштаб">100%</output>
+        <button type="button" data-tree-action="zoom-in" aria-label="Увеличить древо" title="Увеличить древо">+</button>
+        <button type="button" class="tree-view-button" data-tree-action="fit">Показать всё</button>
+        <button type="button" class="tree-view-button" data-tree-action="reset">Исходный вид</button>
+      </div>
+    </div>
+    <div class="legend" aria-label="Условные обозначения">
+      <span><i class="unknown" aria-hidden="true">?</i>Дата неизвестна</span>
+      <span><i class="approx" aria-hidden="true">ок.</i>Приблизительная дата (ок., до, после, между)</span>
+      <span><i class="ok" aria-hidden="true"></i>Сведения из семейных материалов</span>
+      <span><i class="hyp" aria-hidden="true"></i>Гипотеза о личности или родственной связи</span>
+      <span><i class="q" aria-hidden="true"></i>Родственник не найден</span>
     </div>
   </div>
+</section>
+<section class="treewrap" tabindex="0" role="region" aria-label="Древо Скиба" data-tree="skiba" data-section-title="Скиба" data-no-results="На публичных древах ничего не найдено">
+  <div class="tree-stage"><svg class="pedigree" viewBox="0 0 1972 1613" width="1972" height="1613" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pedigree-skiba-title pedigree-skiba-desc"><title id="pedigree-skiba-title">Древо прямых предков</title><desc id="pedigree-skiba-desc">Предки Надежды по отцу и матери. Супруг и общая дочь показаны в начальной семье; предки супруга относятся к разделу «Матюхины». Дальние поколения прокручиваются по горизонтали.</desc><text x="18" y="26" class="colhead">Семья</text><text x="260" y="26" class="colhead">Родители</text><text x="502" y="26" class="colhead">Деды и бабушки</text><text x="744" y="26" class="colhead">Прадеды</text><text x="986" y="26" class="colhead">Прапрадеды</text><text x="1228" y="26" class="colhead">Прапрапрадеды</text><text x="1470" y="26" class="colhead">Прапрапрапрадеды</text><text x="1712" y="26" class="colhead">Прапрапрапрапрадеды</text><path class="ln" d="M232 684.4 H246.0"/><path class="ln" d="M246.0 405.5 V963.2"/><path class="ln" d="M246.0 405.5 H260"/><path class="ln" d="M474 405.5 H488.0"/><path class="ln" d="M488.0 233.0 V578.0"/><path class="ln" d="M488.0 233.0 H502"/><path class="ln" d="M716 233.0 H730.0"/><path class="ln" d="M730.0 141.0 V325.0"/><path class="ln" d="M730.0 141.0 H744"/><path class="ln" d="M958 141.0 H972.0"/><path class="ln" d="M972.0 95.0 V187.0"/><path class="ln" d="M972.0 95.0 H986"/><path class="ln" d="M972.0 187.0 H986"/><path class="ln" d="M730.0 325.0 H744"/><path class="ln" d="M958 325.0 H972.0"/><path class="ln" d="M972.0 279.0 V371.0"/><path class="ln" d="M972.0 279.0 H986"/><path class="ln" d="M972.0 371.0 H986"/><path class="ln" d="M488.0 578.0 H502"/><path class="ln" d="M716 578.0 H730.0"/><path class="ln" d="M730.0 509.0 V647.0"/><path class="ln" d="M730.0 509.0 H744"/><path class="ln" d="M958 509.0 H972.0"/><path class="ln" d="M972.0 463.0 V555.0"/><path class="ln" d="M972.0 463.0 H986"/><path class="ln" d="M972.0 555.0 H986"/><path class="ln" d="M730.0 647.0 H744"/><path class="ln" d="M246.0 963.2 H260"/><path class="ln" d="M474 963.2 H488.0"/><path class="ln" d="M488.0 785.0 V1141.5"/><path class="ln" d="M488.0 785.0 H502"/><path class="ln" d="M716 785.0 H730.0"/><path class="ln" d="M730.0 739.0 V831.0"/><path class="ln" d="M730.0 739.0 H744"/><path class="ln" d="M730.0 831.0 H744"/><path class="ln" d="M488.0 1141.5 H502"/><path class="ln" d="M716 1141.5 H730.0"/><path class="ln" d="M730.0 1038.0 V1245.0"/><path class="ln" d="M730.0 1038.0 H744"/><path class="ln" d="M958 1038.0 H972.0"/><path class="ln" d="M972.0 969.0 V1107.0"/><path class="ln" d="M972.0 969.0 H986"/><path class="ln" d="M1200 969.0 H1214.0"/><path class="ln" d="M1214.0 923.0 V1015.0"/><path class="ln" d="M1214.0 923.0 H1228"/><path class="ln" d="M1214.0 1015.0 H1228"/><path class="ln" d="M972.0 1107.0 H986"/><path class="ln" d="M730.0 1245.0 H744"/><path class="ln" d="M958 1245.0 H972.0"/><path class="ln" d="M972.0 1199.0 V1291.0"/><path class="ln" d="M972.0 1199.0 H986"/><path class="ln" d="M972.0 1291.0 H986"/><path class="ln" d="M12 684.4 V1521.0"/><path class="ln" d="M12 684.4 H18"/><path class="ln" d="M12 1521.0 H18"/><path class="ln" d="M12 1102.7 H18"/><g id="pedigree-skiba-p02" class="bx ok me" data-person-id="p02" data-search="Анна Сергеевна | Анна Сергеевна Матюхина | Матюхин | Матюхина | Матюхина Анна Сергеевна" data-years="р. 2002"><rect class="fr" x="18" y="1063.7" width="214" height="78" rx="10"/><text class="t1" x="30" y="1080.7">Матюхина</text><text class="t2" x="30" y="1097.7">Анна Сергеевна</text><text class="t3" x="30" y="1115.7">2002</text></g><g id="pedigree-skiba-p03" class="bx ok me" data-person-id="p03" data-search="Надежда Эдуардовна | Надежда Эдуардовна Скиба | Скиба | Скиба Надежда Эдуардовна" data-years="р. 1969"><rect class="fr" x="18" y="645.4" width="214" height="78" rx="10"/><text class="t1" x="30" y="662.4">Скиба</text><text class="t2" x="30" y="679.4">Надежда Эдуардовна</text><text class="t3" x="30" y="697.4">1969</text></g><g id="pedigree-skiba-p06" class="bx ok" data-person-id="p06" data-search="Скиба | Скиба Эдуард Алексеевич | Эдуард Алексеевич | Эдуард Алексеевич Скиба" data-years="19 февраля 1937 – 25 мая 2015"><rect class="fr" x="260" y="366.5" width="214" height="78" rx="10"/><text class="t1" x="272" y="383.5">Скиба</text><text class="t2" x="272" y="400.5">Эдуард Алексеевич</text><text class="t3" x="272" y="418.5">19 февраля 1937 – 25 мая 2015</text></g><g id="pedigree-skiba-p12" class="bx ok" data-person-id="p12" data-search="Алексей Григорьевич | Алексей Григорьевич Скиба | Скиба | Скиба Алексей Григорьевич" data-years="10 апреля 1907 – 13 октября 1955"><rect class="fr" x="502" y="194.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="211.0">Скиба</text><text class="t2" x="514" y="228.0">Алексей Григорьевич</text><text class="t3" x="514" y="246.0">10 апреля 1907 – 13 октября 1955</text></g><g id="pedigree-skiba-p21" class="bx ok approx" data-person-id="p21" data-search="Григорий Андреевич | Григорий Андреевич Скиба | Скиба | Скиба Григорий Андреевич" data-years="1879 – после 7 января 1956"><rect class="fr" x="744" y="102.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="119.0">Скиба</text><text class="t2" x="756" y="136.0">Григорий Андреевич</text><text class="t3" x="756" y="154.0">1879 – после 7 января 1956</text></g><g id="pedigree-skiba-p31" class="bx hyp deep" data-person-id="p31" data-search="Андрей Степанович | Андрей Степанович Скиба | Скиба | Скиба Андрей Степанович" data-years="ум. 1891"><rect class="fr" x="986" y="56.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="73.0">Скиба</text><text class="t2" x="998" y="90.0">Андрей Степанович</text><text class="t3" x="998" y="108.0">† 1891</text><rect class="bg" x="998" y="113.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="124.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-skiba-p32" class="bx hyp deep" data-person-id="p32" data-search="Пелагея Васильевна" data-years="ум. 1937"><rect class="fr" x="986" y="148.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="165.0">Пелагея Васильевна</text><text class="t2" x="998" y="182.0"></text><text class="t3" x="998" y="200.0">† 1937</text><rect class="bg" x="998" y="205.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="216.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-skiba-p22" class="bx hyp unknown" data-person-id="p22" data-search="Захарченко | Захарченков | Захарченкова | Захарченкова(Захарченко?) | Захарченкова(Захарченко?) Зинаида Агеевна | Зинаида Агеевна | Зинаида Агеевна Захарченкова(Захарченко?)" data-years="? – ?"><rect class="fr" x="744" y="286.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="303.0">Захарченкова(Захарченко?)</text><text class="t2" x="756" y="320.0">Зинаида Агеевна</text><text class="t3" x="756" y="338.0">даты неизвестны</text><rect class="bg" x="756" y="343.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="354.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-skiba-p33" class="bx hyp deep" data-person-id="p33" data-search="Агей Никифорович | Агей Никифорович Захарченко | Захарченко | Захарченко Агей Никифорович" data-years="ум. 1921"><rect class="fr" x="986" y="240.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="257.0">Захарченко</text><text class="t2" x="998" y="274.0">Агей Никифорович</text><text class="t3" x="998" y="292.0">† 1921</text><rect class="bg" x="998" y="297.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="308.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-skiba-p34" class="bx hyp deep" data-person-id="p34" data-search="Ульяна Васильевна" data-years="ум. 1947"><rect class="fr" x="986" y="332.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="349.0">Ульяна Васильевна</text><text class="t2" x="998" y="366.0"></text><text class="t3" x="998" y="384.0">† 1947</text><rect class="bg" x="998" y="389.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="400.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-skiba-p13" class="bx ok" data-person-id="p13" data-search="Алексеев | Алексеева | Алексеева Маргарита Васильевна | Маргарита Васильевна | Маргарита Васильевна Алексеева" data-years="8 сентября 1909 – 19 июля 1987"><rect class="fr" x="502" y="539.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="556.0">Алексеева</text><text class="t2" x="514" y="573.0">Маргарита Васильевна</text><text class="t3" x="514" y="591.0">8 сентября 1909 – 19 июля 1987</text></g><g id="pedigree-skiba-p23" class="bx ok" data-person-id="p23" data-search="Алексеев | Алексеев Василий Васильевич | Алексеева | Василий Васильевич | Василий Васильевич Алексеев" data-years="1875 – 1935"><rect class="fr" x="744" y="470.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="487.0">Алексеев</text><text class="t2" x="756" y="504.0">Василий Васильевич</text><text class="t3" x="756" y="522.0">1875 – 1935</text></g><g id="pedigree-skiba-p35" class="bx hyp deep unknown" data-person-id="p35" data-search="Алексеев | Алексеев Василий | Алексеева | Василий | Василий Алексеев" data-years="? – ?"><rect class="fr" x="986" y="424.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="441.0">Алексеев</text><text class="t2" x="998" y="458.0">Василий</text><text class="t3" x="998" y="476.0">даты неизвестны</text><rect class="bg" x="998" y="481.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="492.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="516.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="533.0">—</text><text class="t2" x="998" y="550.0">мать не найдена</text><rect class="bg" x="998" y="573.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="584.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-skiba-p24" class="bx ok deep" data-person-id="p24" data-search="Агафья Андреевна" data-years="1880 – 1944"><rect class="fr" x="744" y="608.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="625.0">Агафья Андреевна</text><text class="t2" x="756" y="642.0"></text><text class="t3" x="756" y="660.0">1880 – 1944</text></g><g id="pedigree-skiba-p07" class="bx ok" data-person-id="p07" data-search="Нина Федоровна | Нина Федоровна Поташкина | Поташкин | Поташкина | Поташкина Нина Федоровна" data-years="11 июня 1938 – 23 апреля 2000"><rect class="fr" x="260" y="924.2" width="214" height="78" rx="10"/><text class="t1" x="272" y="941.2">Поташкина</text><text class="t2" x="272" y="958.2">Нина Федоровна</text><text class="t3" x="272" y="976.2">11 июня 1938 – 23 апреля 2000</text></g><g id="pedigree-skiba-p14" class="bx ok" data-person-id="p14" data-search="Поташкин | Поташкин Федор Георгиевич | Поташкина | Федор Георгиевич | Федор Георгиевич Поташкин" data-years="23 февраля 1904 – 11 января 1970"><rect class="fr" x="502" y="746.0" width="214" height="78" rx="10"/><text class="t1" x="514" y="763.0">Поташкин</text><text class="t2" x="514" y="780.0">Федор Георгиевич</text><text class="t3" x="514" y="798.0">23 февраля 1904 – 11 января 1970</text></g><g id="pedigree-skiba-p25" class="bx hyp deep" data-person-id="p25" data-search="Георгий | Георгий Поташкин | Поташкин | Поташкин Георгий | Поташкина" data-years="ум. ма 1919"><rect class="fr" x="744" y="700.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="717.0">Поташкин</text><text class="t2" x="756" y="734.0">Георгий</text><text class="t3" x="756" y="752.0">† ма 1919</text><rect class="bg" x="756" y="757.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="768.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-skiba-p26" class="bx hyp deep unknown" data-person-id="p26" data-search="Дарья" data-years="? – ?"><rect class="fr" x="744" y="792.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="809.0">Дарья</text><text class="t2" x="756" y="826.0"></text><text class="t3" x="756" y="844.0">даты неизвестны</text><rect class="bg" x="756" y="849.0" width="74" height="16" rx="8.0"/><text class="bdg" x="793.0" y="860.4" text-anchor="middle">Гипотеза</text></g><g id="pedigree-skiba-p15" class="bx ok" data-person-id="p15" data-search="Алексеев | Алексеева | Алексеева Серафима Григорьевна | Серафима Григорьевна | Серафима Григорьевна Алексеева" data-years="11 августа 1912 – 26 июля 1988"><rect class="fr" x="502" y="1102.5" width="214" height="78" rx="10"/><text class="t1" x="514" y="1119.5">Алексеева</text><text class="t2" x="514" y="1136.5">Серафима Григорьевна</text><text class="t3" x="514" y="1154.5">11 августа 1912 – 26 июля 1988</text></g><g id="pedigree-skiba-p27" class="bx ok" data-person-id="p27" data-search="Алексеев | Алексеева | Григорий Спиридонович | Григорий Спиридонович Захаров/Алексеев | Захаров | Захаров/Алексеев | Захаров/Алексеев Григорий Спиридонович | Захарова" data-years="23 января 1887 – 16 ноября 1966"><rect class="fr" x="744" y="999.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1016.0">Захаров/Алексеев</text><text class="t2" x="756" y="1033.0">Григорий Спиридонович</text><text class="t3" x="756" y="1051.0">23 января 1887 – 16 ноября 1966</text></g><g id="pedigree-skiba-p36" class="bx ok" data-person-id="p36" data-search="Ермолаевич | Захаров | Захаров Спиридон Ермилович(Ермолаевич) | Захарова | Спиридон Ермилович | Спиридон Ермилович(Ермолаевич) | Спиридон Ермилович(Ермолаевич) Захаров" data-years="р. 1861"><rect class="fr" x="986" y="930.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="947.0">Захаров</text><text class="t2" x="998" y="964.0">Спиридон Ермилович(Ермолаевич)</text><text class="t3" x="998" y="982.0">1861</text></g><g id="pedigree-skiba-p41" class="bx hyp deep approx" data-person-id="p41" data-search="Ермил(а)/Ермолай | Ермил(а)/Ермолай Захаров | Ермил/Ермолай | Ермила/Ермолай | Захаров | Захаров Ермил(а)/Ермолай | Захарова" data-years="р. до 1845"><rect class="fr" x="1228" y="884.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="901.0">Захаров</text><text class="t2" x="1240" y="918.0">Ермил(а)/Ермолай</text><text class="t3" x="1240" y="936.0">до 1845</text><rect class="bg" x="1240" y="941.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1277.0" y="952.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="1228" y="976.0" width="214" height="78" rx="10"/><text class="t1" x="1240" y="993.0">—</text><text class="t2" x="1240" y="1010.0">мать не найдена</text><rect class="bg" x="1240" y="1033.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1283.0" y="1044.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-skiba-p37" class="bx ok deep" data-person-id="p37" data-search="Елизавета Николаевна" data-years="р. 1864"><rect class="fr" x="986" y="1068.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="1085.0">Елизавета Николаевна</text><text class="t2" x="998" y="1102.0"></text><text class="t3" x="998" y="1120.0">1864</text></g><g id="pedigree-skiba-p28" class="bx ok" data-person-id="p28" data-search="Елисеев | Елисеева | Елисеева Зинаида Петровна | Зинаида Петровна | Зинаида Петровна Елисеева" data-years="8 ноября 1888 – 25 февраля 1973"><rect class="fr" x="744" y="1206.0" width="214" height="78" rx="10"/><text class="t1" x="756" y="1223.0">Елисеева</text><text class="t2" x="756" y="1240.0">Зинаида Петровна</text><text class="t3" x="756" y="1258.0">8 ноября 1888 – 25 февраля 1973</text></g><g id="pedigree-skiba-p38" class="bx hyp deep unknown" data-person-id="p38" data-search="Елисеев | Елисеев Петр | Елисеева | Петр | Петр Елисеев" data-years="? – ?"><rect class="fr" x="986" y="1160.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="1177.0">Елисеев</text><text class="t2" x="998" y="1194.0">Петр</text><text class="t3" x="998" y="1212.0">даты неизвестны</text><rect class="bg" x="998" y="1217.0" width="74" height="16" rx="8.0"/><text class="bdg" x="1035.0" y="1228.4" text-anchor="middle">Гипотеза</text></g><g class="bx q"><rect class="fr" x="986" y="1252.0" width="214" height="78" rx="10"/><text class="t1" x="998" y="1269.0">—</text><text class="t2" x="998" y="1286.0">мать не найдена</text><rect class="bg" x="998" y="1309.0" width="86" height="16" rx="8.0"/><text class="bdg" x="1041.0" y="1320.4" text-anchor="middle">Нет данных</text></g><g id="pedigree-skiba-p01" class="bx ok me" data-person-id="p01" data-search="Матюхин | Матюхин Сергей Андреевич | Матюхина | Сергей Андреевич | Сергей Андреевич Матюхин" data-years="р. 1971"><rect class="fr" x="18" y="1482.0" width="214" height="78" rx="10"/><text class="t1" x="30" y="1499.0">Матюхин</text><text class="t2" x="30" y="1516.0">Сергей Андреевич</text><text class="t3" x="30" y="1534.0">1971</text></g></svg></div>
 </section>
 </div>
 
@@ -717,6 +785,9 @@ footer b{color:var(--hero-ink)}
 
 <script>
 var cachedNavH = 56;
+var treeViews = {};
+var pendingTreeFocus = null;
+
 function measureNavHeight() {
   var nav = document.querySelector('nav');
   if (!nav) return cachedNavH;
@@ -727,6 +798,7 @@ function measureNavHeight() {
   }
   return cachedNavH;
 }
+
 function syncOverHero() {
   var heroEl = document.querySelector('#page1 .hero');
   var home = document.getElementById('page1');
@@ -737,6 +809,291 @@ function syncOverHero() {
   var rect = heroEl.getBoundingClientRect();
   document.body.classList.toggle('over-hero', rect.bottom > cachedNavH + 8);
 }
+
+function applyTreeScale(view, requested) {
+  var next = Math.max(0.05, Math.min(4, requested));
+  view.scale = next;
+  view.svg.style.width = (view.baseWidth * next) + 'px';
+  view.svg.style.height = (view.baseHeight * next) + 'px';
+  view.wrap.setAttribute('data-scale', next.toFixed(3));
+  var output = document.querySelector('[data-controls-tree="' + view.key + '"] [data-zoom-value]');
+  if (output) output.textContent = Math.round(next * 100) + '%';
+}
+
+function zoomTree(view, factor, clientX, clientY) {
+  if (!view.wrap.closest('.page').classList.contains('visible')) return;
+  var next = Math.max(0.05, Math.min(4, view.scale * factor));
+  if (next === view.scale) return;
+  var rect = view.wrap.getBoundingClientRect();
+  var px = clientX == null ? view.wrap.clientWidth / 2 : clientX - rect.left;
+  var py = clientY == null ? view.wrap.clientHeight / 2 : clientY - rect.top;
+  var treeX = (view.wrap.scrollLeft + px - view.svg.offsetLeft) / view.scale;
+  var treeY = (view.wrap.scrollTop + py - view.svg.offsetTop) / view.scale;
+  applyTreeScale(view, next);
+  view.wrap.scrollLeft = view.svg.offsetLeft + treeX * next - px;
+  view.wrap.scrollTop = view.svg.offsetTop + treeY * next - py;
+}
+
+function fitTree(view) {
+  if (!view.wrap.closest('.page').classList.contains('visible')) return;
+  var style = getComputedStyle(view.stage);
+  var horizontal = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  var vertical = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  var next = Math.min(
+    (view.wrap.clientWidth - horizontal) / view.baseWidth,
+    (view.wrap.clientHeight - vertical) / view.baseHeight
+  );
+  applyTreeScale(view, next);
+  view.wrap.scrollLeft = Math.max(0, (view.wrap.scrollWidth - view.wrap.clientWidth) / 2);
+  view.wrap.scrollTop = Math.max(0, (view.wrap.scrollHeight - view.wrap.clientHeight) / 2);
+}
+
+function resetTree(view) {
+  applyTreeScale(view, 1);
+  view.wrap.scrollLeft = 0;
+  view.wrap.scrollTop = 0;
+}
+
+function clearTreeHighlight() {
+  document.querySelectorAll('.pedigree .search-hit').forEach(function(card) {
+    card.classList.remove('search-hit');
+  });
+}
+
+function focusTreeCard(focus) {
+  var view = treeViews[focus.tree];
+  var card = document.getElementById(focus.cardId);
+  if (!view || !card) return;
+  clearTreeHighlight();
+  var wrapRect = view.wrap.getBoundingClientRect();
+  var cardRect = card.getBoundingClientRect();
+  view.wrap.scrollLeft += cardRect.left + cardRect.width / 2 - wrapRect.left - view.wrap.clientWidth / 2;
+  view.wrap.scrollTop += cardRect.top + cardRect.height / 2 - wrapRect.top - view.wrap.clientHeight / 2;
+  card.classList.add('search-hit');
+  view.wrap.focus({preventScroll: true});
+}
+
+function initTree(wrap) {
+  var svg = wrap.querySelector('.pedigree');
+  if (!svg) return;
+  var box = svg.viewBox.baseVal;
+  var view = {
+    key: wrap.getAttribute('data-tree'),
+    wrap: wrap,
+    stage: wrap.querySelector('.tree-stage'),
+    svg: svg,
+    baseWidth: box.width,
+    baseHeight: box.height,
+    scale: 1
+  };
+  treeViews[view.key] = view;
+  applyTreeScale(view, 1);
+
+  var controls = document.querySelector('[data-controls-tree="' + view.key + '"]');
+  if (controls) {
+    controls.querySelectorAll('[data-tree-action]').forEach(function(button) {
+      button.addEventListener('click', function() {
+        var action = button.getAttribute('data-tree-action');
+        if (action === 'zoom-in') zoomTree(view, 1.25);
+        if (action === 'zoom-out') zoomTree(view, 0.8);
+        if (action === 'fit') fitTree(view);
+        if (action === 'reset') resetTree(view);
+      });
+    });
+  }
+
+  var pointers = new Map();
+  var drag = null;
+  var pinch = null;
+
+  function pointerPair() {
+    return Array.from(pointers.values()).slice(0, 2);
+  }
+
+  function startPinch() {
+    var pair = pointerPair();
+    if (pair.length < 2) return;
+    var rect = wrap.getBoundingClientRect();
+    var mx = (pair[0].x + pair[1].x) / 2 - rect.left;
+    var my = (pair[0].y + pair[1].y) / 2 - rect.top;
+    pinch = {
+      distance: Math.max(1, Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y)),
+      scale: view.scale,
+      treeX: (wrap.scrollLeft + mx - svg.offsetLeft) / view.scale,
+      treeY: (wrap.scrollTop + my - svg.offsetTop) / view.scale
+    };
+    drag = null;
+  }
+
+  wrap.addEventListener('pointerdown', function(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    pointers.set(event.pointerId, {id: event.pointerId, x: event.clientX, y: event.clientY});
+    wrap.setPointerCapture(event.pointerId);
+    wrap.classList.add('is-panning');
+    if (pointers.size === 1) {
+      drag = {id: event.pointerId, x: event.clientX, y: event.clientY, left: wrap.scrollLeft, top: wrap.scrollTop};
+      pinch = null;
+    } else if (pointers.size === 2) {
+      startPinch();
+    }
+    event.preventDefault();
+  });
+
+  wrap.addEventListener('pointermove', function(event) {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.set(event.pointerId, {id: event.pointerId, x: event.clientX, y: event.clientY});
+    if (pointers.size >= 2) {
+      if (!pinch) startPinch();
+      var pair = pointerPair();
+      var distance = Math.max(1, Math.hypot(pair[0].x - pair[1].x, pair[0].y - pair[1].y));
+      var rect = wrap.getBoundingClientRect();
+      var mx = (pair[0].x + pair[1].x) / 2 - rect.left;
+      var my = (pair[0].y + pair[1].y) / 2 - rect.top;
+      applyTreeScale(view, pinch.scale * distance / pinch.distance);
+      wrap.scrollLeft = svg.offsetLeft + pinch.treeX * view.scale - mx;
+      wrap.scrollTop = svg.offsetTop + pinch.treeY * view.scale - my;
+    } else if (drag && drag.id === event.pointerId) {
+      wrap.scrollLeft = drag.left - (event.clientX - drag.x);
+      wrap.scrollTop = drag.top - (event.clientY - drag.y);
+    }
+    event.preventDefault();
+  });
+
+  function endPointer(event) {
+    if (!pointers.has(event.pointerId)) return;
+    pointers.delete(event.pointerId);
+    pinch = null;
+    drag = null;
+    if (pointers.size === 1) {
+      var remaining = pointerPair()[0];
+      drag = {id: remaining.id, x: remaining.x, y: remaining.y, left: wrap.scrollLeft, top: wrap.scrollTop};
+    }
+    if (pointers.size === 0) wrap.classList.remove('is-panning');
+  }
+  wrap.addEventListener('pointerup', endPointer);
+  wrap.addEventListener('pointercancel', endPointer);
+  wrap.addEventListener('lostpointercapture', endPointer);
+  wrap.addEventListener('dragstart', function(event) { event.preventDefault(); });
+}
+
+function normalizedSearch(value) {
+  return (value || '').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/gi, ' ').trim();
+}
+
+function hideSearchResults(search) {
+  var results = search.querySelector('.search-results');
+  results.hidden = true;
+  search.querySelector('input').setAttribute('aria-expanded', 'false');
+}
+
+function chooseSearchResult(search, button) {
+  var focus = {cardId: button.getAttribute('data-card-id'), tree: button.getAttribute('data-tree')};
+  hideSearchResults(search);
+  if (window.location.hash === '#' + focus.tree + '-tree') {
+    pendingTreeFocus = null;
+    requestAnimationFrame(function() { focusTreeCard(focus); });
+  } else {
+    pendingTreeFocus = focus;
+    window.location.hash = focus.tree + '-tree';
+  }
+}
+
+function renderSearchResults(search) {
+  var input = search.querySelector('input');
+  var scope = search.querySelector('select').value;
+  var localTree = search.getAttribute('data-search-tree');
+  var results = search.querySelector('.search-results');
+  var query = normalizedSearch(input.value);
+  results.textContent = '';
+  if (!query) {
+    hideSearchResults(search);
+    return;
+  }
+  var tokens = query.split(/\s+/);
+  var matches = [];
+  document.querySelectorAll('.pedigree .bx[data-search]').forEach(function(card) {
+    var tree = card.closest('.treewrap').getAttribute('data-tree');
+    if (scope === 'local' && tree !== localTree) return;
+    var haystack = normalizedSearch(card.getAttribute('data-search'));
+    if (!tokens.every(function(token) { return haystack.indexOf(token) !== -1; })) return;
+    matches.push(card);
+  });
+  matches.sort(function(a, b) {
+    var an = a.getAttribute('data-search');
+    var bn = b.getAttribute('data-search');
+    return an.localeCompare(bn, 'ru') || a.id.localeCompare(b.id);
+  });
+
+  if (!matches.length) {
+    var empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = document.querySelector('.treewrap[data-tree="' + localTree + '"]').getAttribute('data-no-results');
+    results.appendChild(empty);
+  }
+  matches.forEach(function(card) {
+    var wrap = card.closest('.treewrap');
+    var tree = wrap.getAttribute('data-tree');
+    var name = Array.from(card.querySelectorAll('.t1, .t2')).map(function(text) {
+      return text.textContent.trim();
+    }).filter(Boolean).join(' ');
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'search-result';
+    button.setAttribute('role', 'option');
+    button.setAttribute('aria-selected', 'false');
+    button.setAttribute('data-card-id', card.id);
+    button.setAttribute('data-tree', tree);
+    var nameEl = document.createElement('span');
+    nameEl.className = 'result-name';
+    nameEl.textContent = name;
+    var yearsEl = document.createElement('span');
+    yearsEl.className = 'result-years';
+    yearsEl.textContent = card.getAttribute('data-years');
+    button.appendChild(nameEl);
+    button.appendChild(yearsEl);
+    if (scope === 'global') {
+      var sectionEl = document.createElement('span');
+      sectionEl.className = 'result-section';
+      sectionEl.textContent = wrap.getAttribute('data-section-title');
+      button.appendChild(sectionEl);
+    }
+    button.addEventListener('click', function() { chooseSearchResult(search, button); });
+    button.addEventListener('keydown', function(event) {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      var sibling = event.key === 'ArrowDown' ? button.nextElementSibling : button.previousElementSibling;
+      if (sibling && sibling.classList.contains('search-result')) sibling.focus();
+    });
+    results.appendChild(button);
+  });
+  results.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+
+function initSearch(search) {
+  var input = search.querySelector('input');
+  input.addEventListener('input', function() { renderSearchResults(search); });
+  input.addEventListener('focus', function() { renderSearchResults(search); });
+  input.addEventListener('keydown', function(event) {
+    var first = search.querySelector('.search-result');
+    if (event.key === 'ArrowDown' && first) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.key === 'Enter' && first) {
+      event.preventDefault();
+      chooseSearchResult(search, first);
+    } else if (event.key === 'Escape') {
+      hideSearchResults(search);
+    }
+  });
+  input.addEventListener('blur', function() {
+    setTimeout(function() {
+      if (!search.contains(document.activeElement)) hideSearchResults(search);
+    }, 100);
+  });
+  search.querySelector('select').addEventListener('change', function() { renderSearchResults(search); });
+}
+
 function resolveRoute() {
   var hash = window.location.hash.slice(1) || 'top';
   var target = document.getElementById(hash);
@@ -765,8 +1122,16 @@ function resolveRoute() {
   requestAnimationFrame(function() {
     target.scrollIntoView({block:'start'});
     syncOverHero();
+    if (pendingTreeFocus) {
+      var focus = pendingTreeFocus;
+      pendingTreeFocus = null;
+      focusTreeCard(focus);
+    }
   });
 }
+
+document.querySelectorAll('.treewrap').forEach(initTree);
+document.querySelectorAll('.tree-search').forEach(initSearch);
 window.addEventListener('hashchange', resolveRoute);
 var heroEl = document.querySelector('#page1 .hero');
 if (heroEl && 'IntersectionObserver' in window) {
