@@ -410,9 +410,8 @@ def validate_content(content: Any) -> None:
     require_str(tree["missing_mother"], "tree.missing_mother")
 
     footer = require_mapping(content["footer"], "footer")
-    require_keys(footer, "footer", ["brand", "privacy_note"])
+    require_keys(footer, "footer", ["brand"])
     require_str(footer["brand"], "footer.brand")
-    require_str(footer["privacy_note"], "footer.privacy_note")
 
 
 def esc(text: str) -> str:
@@ -2292,11 +2291,10 @@ def render_tree_page(
 
 
 def render_footer(footer: dict[str, Any]) -> str:
-    """Site footer with the single public privacy reminder."""
+    """Site footer: archive name only."""
     return f"""<footer id="contacts">
   <div class="wrap">
     <b>{esc(footer["brand"])}</b>
-    <p class="footer-privacy">{rich(footer["privacy_note"])}</p>
   </div>
 </footer>
 
