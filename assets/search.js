@@ -30,6 +30,25 @@ function hideSearchResults(search) {
   if (input) input.setAttribute('aria-expanded', 'false');
 }
 
+function setNavSearchOpen(search, open) {
+  var toggle = document.querySelector('[data-nav-search-toggle]');
+  if (open) {
+    search.removeAttribute('hidden');
+    search.classList.add('is-open');
+    if (toggle) toggle.setAttribute('aria-expanded', 'true');
+    var input = search.querySelector('input');
+    if (input) input.focus();
+  } else {
+    search.setAttribute('hidden', '');
+    search.classList.remove('is-open');
+    hideSearchResults(search);
+    var input = search.querySelector('input');
+    if (input) input.value = '';
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  }
+  if (typeof measureNavHeight === 'function') measureNavHeight();
+}
+
 function placementFor(person, preferredTree) {
   var trees = person.trees || [];
   var index;
@@ -89,13 +108,9 @@ function presentSearchMatches(search, matches, emptyText, appendMatches) {
 
 function renderSearchResults(search) {
   var input = search.querySelector('input');
-  var scope = search.querySelector('select').value;
   var localTree = search.getAttribute('data-search-tree');
-  var matches = matchPeople(input.value, 'all', scope === 'local' ? localTree : '');
-  var emptyText = scope === 'global'
-    ? (search.getAttribute('data-no-results-all') || search.getAttribute('data-no-results') || '')
-    : (search.getAttribute('data-no-results') || '');
-  presentSearchMatches(search, matches, emptyText, function(results, people) {
+  var matches = matchPeople(input.value, 'all', localTree);
+  presentSearchMatches(search, matches, search.getAttribute('data-no-results') || '', function(results, people) {
     people.forEach(function(person) {
       var placement = placementFor(person, localTree);
       var button = document.createElement('button');
@@ -104,16 +119,11 @@ function renderSearchResults(search) {
       button.setAttribute('role', 'option');
       button.setAttribute('aria-selected', 'false');
       button.setAttribute('data-person-id', person.id);
-      if (placement && (scope === 'local' || person.trees.length)) {
-        if (scope === 'local' || placement) {
-          button.setAttribute('data-card-id', placement.card);
-          button.setAttribute('data-tree', placement.key);
-        }
+      if (placement) {
+        button.setAttribute('data-card-id', placement.card);
+        button.setAttribute('data-tree', placement.key);
       }
-      if (scope !== 'local' && !placement) {
-        button.removeAttribute('data-card-id');
-      }
-      appendResultText(button, person, scope === 'global');
+      appendResultText(button, person, false);
       button.addEventListener('click', function() { chooseSearchResult(search, button); });
       button.addEventListener('keydown', function(event) {
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -126,31 +136,48 @@ function renderSearchResults(search) {
   });
 }
 
+function closeNavSearchAfterAction(search, returnToResults) {
+  if (returnToResults) {
+    var input = search.querySelector('input');
+    pendingPersonSearchReturn = {
+      query: input.value,
+      hash: window.location.hash || '#top'
+    };
+  }
+  hideSearchResults(search);
+  setNavSearchOpen(search, false);
+}
+
 function renderNavResults(search) {
   var input = search.querySelector('input');
-  var scope = search.querySelector('select').value;
-  var matches = matchPeople(input.value, scope, '');
+  var matches = matchPeople(input.value, 'all', '');
   var inTreeLabel = search.getAttribute('data-in-tree') || '';
   presentSearchMatches(search, matches, search.getAttribute('data-no-results') || '', function(results, people) {
     people.forEach(function(person) {
       var row = document.createElement('div');
-      row.className = 'search-result';
+      row.className = 'search-result search-result-nav';
       row.setAttribute('role', 'option');
       var open = document.createElement('a');
-      open.className = 'result-open';
+      open.className = 'result-main';
       open.href = '#person-' + person.id;
       appendResultText(open, person, true);
-      open.addEventListener('click', function() { hideSearchResults(search); });
+      open.addEventListener('click', function() { closeNavSearchAfterAction(search, true); });
       row.appendChild(open);
-      (person.trees || []).forEach(function(tree) {
-        var treeLink = document.createElement('a');
-        treeLink.className = 'result-tree';
-        treeLink.href = '#' + tree.key + '-tree';
-        treeLink.setAttribute('data-show-tree', tree.key);
-        treeLink.setAttribute('data-card-id', tree.card);
-        treeLink.textContent = person.trees.length > 1 ? inTreeLabel + ' · ' + tree.title : inTreeLabel;
-        row.appendChild(treeLink);
-      });
+      if (person.trees && person.trees.length) {
+        var actions = document.createElement('div');
+        actions.className = 'result-tree-actions';
+        person.trees.forEach(function(tree) {
+          var treeLink = document.createElement('a');
+          treeLink.className = 'result-tree';
+          treeLink.href = '#' + tree.key + '-tree';
+          treeLink.setAttribute('data-show-tree', tree.key);
+          treeLink.setAttribute('data-card-id', tree.card);
+          treeLink.textContent = inTreeLabel + ' · ' + tree.title;
+          treeLink.addEventListener('click', function() { closeNavSearchAfterAction(search); });
+          actions.appendChild(treeLink);
+        });
+        row.appendChild(actions);
+      }
       results.appendChild(row);
     });
   });
@@ -158,29 +185,32 @@ function renderNavResults(search) {
 
 function bindSearchKeys(search, render) {
   var input = search.querySelector('input');
+  var isNav = search.hasAttribute('data-person-search');
   input.addEventListener('input', function() {
     if (!normalizedSearch(input.value)) clearTreeHighlight();
     render(search);
   });
   input.addEventListener('focus', function() { render(search); });
   input.addEventListener('keydown', function(event) {
-    var first = search.querySelector('button.search-result, a.result-open');
+    var first = search.querySelector('button.search-result, a.result-main');
     if (event.key === 'ArrowDown' && first) {
       event.preventDefault();
       first.focus();
     } else if (event.key === 'Enter') {
-      var open = search.querySelector('a.result-open');
+      var open = search.querySelector('a.result-main');
       var button = search.querySelector('button.search-result');
       if (open) {
         event.preventDefault();
         openPerson(open.getAttribute('href').slice(8));
-        hideSearchResults(search);
+        if (isNav) closeNavSearchAfterAction(search, true);
+        else hideSearchResults(search);
       } else if (button) {
         event.preventDefault();
         chooseSearchResult(search, button);
       }
     } else if (event.key === 'Escape') {
       hideSearchResults(search);
+      if (isNav) setNavSearchOpen(search, false);
     }
   });
   input.addEventListener('blur', function() {
@@ -188,8 +218,6 @@ function bindSearchKeys(search, render) {
       if (!search.contains(document.activeElement)) hideSearchResults(search);
     }, 150);
   });
-  var select = search.querySelector('select');
-  if (select) select.addEventListener('change', function() { render(search); });
 }
 
 function initSearch(search) {
@@ -198,4 +226,14 @@ function initSearch(search) {
 
 function initPersonSearch(search) {
   bindSearchKeys(search, renderNavResults);
+  var toggle = document.querySelector('[data-nav-search-toggle]');
+  var closeBtn = search.querySelector('[data-search-close]');
+  if (toggle) {
+    toggle.addEventListener('click', function() {
+      setNavSearchOpen(search, !search.classList.contains('is-open'));
+    });
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() { setNavSearchOpen(search, false); });
+  }
 }

@@ -260,8 +260,8 @@ def test_home_cover_keeps_hero_and_drops_branch_blurbs(tmp_path):
     assert 'type="search"' not in page
 
 
-def test_family_parts_keep_direct_links_and_demote_chronicle(tmp_path):
-    """Пять частей раздела — отдельные страницы; хроника остаётся, но не в основной навигации."""
+def test_family_parts_keep_direct_links_and_replace_chronicle_page(tmp_path):
+    """Пять компактных частей; старая ссылка хроники ведёт к документам без длинной ленты."""
     code, log, html = build_in_tmp(tmp_path)
     assert code == 0, log
     for key in ("matyukhiny", "skiba"):
@@ -269,9 +269,23 @@ def test_family_parts_keep_direct_links_and_demote_chronicle(tmp_path):
         for suffix in ("branches", "tree", "people", "sources", "places"):
             assert f'id="{key}-{suffix}"' in html
             assert f'href="#{key}-{suffix}"' in html
+        hub = html.split(f'id="page-{key}"', 1)[1].split(f'id="page-{key}-people"', 1)[0]
+        assert f'id="{key}-branches"' in hub
+        assert f'id="page-{key}-branches"' not in html
         assert f'id="{key}-timeline"' in html
+        assert f'id="page-{key}-timeline"' not in html
+        assert f'<section id="{key}-timeline">' not in html
         assert f'href="#{key}-timeline"' not in html
         assert f'id="{key}-gallery"' not in html
+        assert f'<a class="active" href="#{key}-branches" aria-current="page">Ветви</a>' in html
+        assert f'<a class="active" href="#{key}-tree" aria-current="page">Древо</a>' in html
+        assert f'<a href="#{key}-people">Люди</a>' in html
+        assert f'<a href="#{key}-sources">Документы</a>' in html
+        assert f'<a href="#{key}-places">Места</a>' in html
+        assert f'href="#{key}-branches">Родовые ветви</a>' not in html
+        assert f'href="#{key}-tree">Генеалогическое древо</a>' not in html
+        assert f'href="#{key}-places">Географический указатель</a>' not in html
+    assert "Значимые события" not in html
     assert "Связь семьи из ревизской сказки 1834 года" in html
     assert "Две семьи Алексеевых не являются родственными." in html
     assert "Архивные направления" not in html
@@ -331,6 +345,41 @@ def test_person_card_id_and_collateral_sibling(tmp_path):
     assert "город Примерск" in sibling
 
 
+def test_person_card_compact_relatives_child_order_and_navigation(tmp_path):
+    """P3: дети по старшинству, супруг в нужном числе, даты только в шапке."""
+    data = fixture_data()
+    data["persons"].extend([
+        {"id": "c01", "name": "Младший", "birth": "2003", "deceased": True},
+        {"id": "c02", "name": "Старший", "birth": "2000", "deceased": True},
+        {"id": "c03", "name": "Без даты", "deceased": True},
+        {"id": "c04", "name": "Тоже без даты", "deceased": True},
+        {"id": "t12", "name": "Вторая Супруга", "birth": "1975", "deceased": True},
+    ])
+    data["families"][0]["chil"] = ["t03", "c01", "c02", "c04", "c03"]
+    data["families"].append({"husb": "t01", "wife": "t12", "chil": []})
+    code, log, html = build_in_tmp(tmp_path, data=data)
+    assert code == 0, log
+
+    card = html.split('id="person-t01"', 1)[1].split("</article>", 1)[0]
+    ordered = [card.index(f'href="#person-{pid}"') for pid in ("c02", "t03", "c01", "c04", "c03")]
+    assert ordered == sorted(ordered)
+    assert '<dt>Супруги</dt>' in card
+    assert 'class="person-life">р. 1971</p>' in card
+    assert card.count("1971") == 1
+    assert "<dt>Рождение</dt>" not in card and "<dt>Смерть</dt>" not in card
+    assert 'class="person-relatives"' in card
+    assert 'class="relative-name"' in card and 'class="relative-years"' in card
+    assert 'data-person-photo-slot hidden' in card
+    assert "<img" not in card and "<dd></dd>" not in card
+    assert 'data-person-back' in card
+    assert "function configurePersonBack(" in html
+    assert "function restoreNavSearchResults(" in html
+
+    one_spouse = html.split('id="person-t04"', 1)[1].split("</article>", 1)[0]
+    assert "<dt>Супруг</dt>" in one_spouse
+    assert "<dt>Супруги</dt>" not in one_spouse
+
+
 def test_public_search_index_links_cards_and_keeps_private_fields_out(tmp_path):
     """Глобальный индекс: публичные люди, альтернативная фамилия, без мест и заметок."""
     data = fixture_data()
@@ -379,12 +428,16 @@ def test_public_search_index_links_cards_and_keeps_private_fields_out(tmp_path):
     css = (REPO / "assets" / "site.css").read_text(encoding="utf-8")
     face = css.split(".pedigree .fr{")[1].split("}")[0]
     assert "var(" not in face
-    assert "#F8F9FB" in face
+    assert "#24262D" in face
     assert "forced-color-adjust:none" in css
     assert "color-scheme:light" in css
     assert "applyTreeScale(view, 1)" in html
-    assert 'stroke="#22252B"' not in html
-    assert 'fill="#22252B"' in html
+    assert 'fill="#F8F9FB"' not in html
+    assert 'fill="#F2F1F6"' in html
+    assert 'fill="#B8BCC9"' in html
+    assert ".pedigree .bx.me .fr,.pedigree .bx.selected .fr" in css
+    assert ".pedigree .bx.search-hit .fr" in css
+    assert "#AFA4D4" in css and "#E2D9FF" in css
 
 
 def test_search_script_is_inlined_with_shared_results_helper(tmp_path):
@@ -408,15 +461,47 @@ def test_search_script_is_inlined_with_shared_results_helper(tmp_path):
     assert "button.className = 'search-result'" in render_tree
     assert "open.className = 'result-open'" not in render_tree
     assert "treeLink.className = 'result-tree'" not in render_tree
-    assert "open.className = 'result-open'" in render_nav
+    assert "open.className = 'result-main'" in render_nav
     assert "treeLink.className = 'result-tree'" in render_nav
+    assert "search-result-nav" in render_nav
     assert "button.className = 'search-result'" not in render_nav
+    assert "setNavSearchOpen" in html
+    assert 'id="archive-scope"' not in html
+    assert 'id="scope-matyukhiny"' not in html
+    assert 'id="scope-skiba"' not in html
+    assert 'data-nav-search-toggle' in html
+    assert 'data-search-close' in html
+    assert "matchPeople(input.value, 'all', localTree)" in render_tree
+    assert "applyTreeScale(view, 1)" in html
+    assert "card.classList.add('search-hit')" in html
     blob = html.split('id="person-index">', 1)[1].split("</script>", 1)[0]
     import json
     living = next(item for item in json.loads(blob) if item["id"] == "t01")
     assert living["years"] == "р. 1971"
     assert "place" not in living
     assert set(living) == {"id", "name", "search", "years", "sections", "trees"}
+
+
+def test_nav_global_search_one_row_per_person_and_dual_tree_markup(tmp_path):
+    """Глобальный поиск: без scope, одна строка на человека, две ссылки в древо в разметке."""
+    code, log, html = build_in_tmp(tmp_path)
+    assert code == 0, log
+    blob = html.split('id="person-index">', 1)[1].split("</script>", 1)[0]
+    import json
+    records = json.loads(blob)
+    by_id = {item["id"]: item for item in records}
+    assert len(records) == len(by_id)
+    dual = by_id["t02"]
+    assert len(dual["sections"]) == 2
+    assert len(dual["trees"]) == 2
+    nav_html = html.split("<nav>", 1)[1].split("</nav>", 1)[0]
+    assert "archive-scope" not in nav_html
+    assert "Весь архив" not in nav_html
+    assert "nav-search" in nav_html
+    assert nav_html.count('hidden') >= 1
+    css = (REPO / "assets" / "site.css").read_text(encoding="utf-8")
+    assert ".search-result-nav" in css
+    assert "flex-direction:column" in css.split(".search-result-nav", 1)[1].split("}", 1)[0]
 
 
 def test_build_fails_cleanly_without_data(tmp_path):

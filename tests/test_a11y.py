@@ -33,15 +33,20 @@ def test_treewrap_scrollable_region_focusable(tmp_path):
 
 
 def test_search_and_zoom_controls_have_accessible_names(tmp_path):
-    """Поля, выбор области и кнопки масштаба имеют явные доступные подписи."""
+    """Поля и кнопки древа имеют явные доступные подписи, лишних scope-select нет."""
     code, log, html = build_in_tmp(tmp_path)
     assert code == 0, log
     assert html.count('role="combobox" aria-autocomplete="list"') == 3
     assert 'id="archive-search"' in html
-    assert html.count('aria-label="Область поиска"') == 3
+    assert 'data-nav-search-toggle' in html
+    assert 'id="archive-scope"' not in html
+    assert 'aria-label="Область поиска"' not in html
     assert html.count('aria-label="Увеличить древо"') == 2
     assert html.count('aria-label="Уменьшить древо"') == 2
     assert html.count('aria-label="Текущий масштаб"') == 2
+    assert html.count('title="Показать всё древо"') == 2
+    assert html.count('title="Вернуть исходный вид"') == 2
+    assert html.count('aria-label="Развернуть древо без навигации сайта"') == 2
 
 
 def test_nav_active_state_announced(tmp_path):

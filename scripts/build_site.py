@@ -312,9 +312,27 @@ def validate_content(content: Any) -> None:
     require_keys(
         archive_search,
         "archive_search",
-        ["label", "placeholder", "all", "no_results", "in_tree", "show_in_tree"],
+        [
+            "label",
+            "placeholder",
+            "all",
+            "no_results",
+            "in_tree",
+            "show_in_tree",
+            "open",
+            "close",
+        ],
     )
-    for key in ("label", "placeholder", "all", "no_results", "in_tree", "show_in_tree"):
+    for key in (
+        "label",
+        "placeholder",
+        "all",
+        "no_results",
+        "in_tree",
+        "show_in_tree",
+        "open",
+        "close",
+    ):
         require_str(archive_search[key], f"archive_search.{key}")
 
     sections = require_mapping(content["sections"], "sections")
@@ -446,9 +464,13 @@ def validate_content(content: Any) -> None:
     require_list(tree["column_titles"], "tree.column_titles", min_len=6)
     require_keys(require_mapping(tree["status"], "tree.status"), "tree.status", ["ok", "hyp", "q"])
     search = require_mapping(tree["search"], "tree.search")
-    require_keys(search, "tree.search", ["label", "placeholder", "local", "global", "no_results"])
+    require_keys(search, "tree.search", ["label", "placeholder", "no_results"])
     controls = require_mapping(tree["controls"], "tree.controls")
-    require_keys(controls, "tree.controls", ["group", "zoom_out", "zoom_in", "fit", "reset"])
+    require_keys(
+        controls,
+        "tree.controls",
+        ["group", "zoom_out", "zoom_in", "fit", "reset", "fullscreen", "exit_fullscreen"],
+    )
     require_keys(
         require_mapping(tree["legend"], "tree.legend"),
         "tree.legend",
@@ -646,9 +668,9 @@ def render_badge(x: float, cy: float, status: str, labels: dict[str, str]) -> st
         return ""
     width = STATUS_BADGE_W[status]
     if status == "hyp":
-        bg_fill, text_fill = "rgba(111,102,144,.10)", "#6F6690"
+        bg_fill, text_fill = "rgba(175,164,212,.16)", "#C9BFE8"
     else:
-        bg_fill, text_fill = "rgba(34,37,43,.05)", "#454A55"
+        bg_fill, text_fill = "#24262D", "#F2F1F6"
     return (
         f'<rect class="bg" fill="{bg_fill}" x="{x + 12}" y="{cy + 18:.1f}" width="{width}" '
         f'height="{BADGE_H}" rx="{BADGE_H / 2}"/>'
@@ -712,17 +734,17 @@ def _box_paint(classes: list[str]) -> tuple[str, str]:
 
     Custom properties are not used here: when the SVG viewport is resized,
     a variable on the rectangle and a variable on the text can resolve apart,
-    so a light face ends up under light text.
+    leaving text on a face with insufficient contrast.
     """
-    fill = "#E6E9EE" if "me" in classes else "#F8F9FB"
-    if "hyp" in classes:
-        stroke = "#6F6690"
-    elif "me" in classes:
-        stroke = "#454A55"
+    fill = "#292733" if "me" in classes or "selected" in classes else "#24262D"
+    if "me" in classes or "selected" in classes:
+        stroke = "#AFA4D4"
+    elif "hyp" in classes:
+        stroke = "#AFA4D4"
     elif "ok" in classes:
-        stroke = "#6A7686"
+        stroke = "#7E8998"
     else:
-        stroke = "#B4BBC6"
+        stroke = "#697180"
     return fill, stroke
 
 
@@ -753,12 +775,13 @@ def render_person_box(
     return (
         f'<a id="{esc(card_id)}" class="{" ".join(classes)}" href="#person-{esc(person.id)}" '
         f'data-person-id="{esc(person.id)}" data-search="{esc(person_search_text(person))}" '
-        f'data-years="{esc(person.public_years)}">'
+        f'data-years="{esc(person.public_years)}" '
+        f'aria-label="Открыть карточку: {esc(person.display_name)}, {esc(person.public_years)}">'
         f'<rect class="fr" fill="{fill}" stroke="{stroke}" x="{x}" y="{cy - BOX_H / 2:.1f}" '
         f'width="{BOX_W}" height="{BOX_H}" rx="10"/>'
-        f'<text class="t1" fill="#22252B" x="{x + 12}" y="{cy - 22:.1f}">{esc(surname)}</text>'
-        f'<text class="t2" fill="#22252B" x="{x + 12}" y="{cy - 5:.1f}">{esc(given)}</text>'
-        f'<text class="t3" fill="#454A55" x="{x + 12}" y="{cy + 13:.1f}">{esc(years)}</text>'
+        f'<text class="t1" fill="#F2F1F6" x="{x + 12}" y="{cy - 22:.1f}">{esc(surname)}</text>'
+        f'<text class="t2" fill="#F2F1F6" x="{x + 12}" y="{cy - 5:.1f}">{esc(given)}</text>'
+        f'<text class="t3" fill="#B8BCC9" x="{x + 12}" y="{cy + 13:.1f}">{esc(years)}</text>'
         f'{render_badge(x, cy, status, labels)}</a>'
     )
 
@@ -769,10 +792,10 @@ def render_box(node: TreeNode, labels: dict[str, str], id_prefix: str) -> str:
     if node.is_missing:
         return (
             f'<g class="bx q">'
-            f'<rect class="fr" fill="none" stroke="#B4BBC6" x="{x}" y="{node.y - BOX_H / 2:.1f}" '
+            f'<rect class="fr" fill="none" stroke="#697180" x="{x}" y="{node.y - BOX_H / 2:.1f}" '
             f'width="{BOX_W}" height="{BOX_H}" rx="10"/>'
-            f'<text class="t1" fill="#565B66" x="{x + 12}" y="{node.y - 22:.1f}">—</text>'
-            f'<text class="t2" fill="#565B66" x="{x + 12}" y="{node.y - 5:.1f}">{esc(node.placeholder)}</text>'
+            f'<text class="t1" fill="#697180" x="{x + 12}" y="{node.y - 22:.1f}">—</text>'
+            f'<text class="t2" fill="#697180" x="{x + 12}" y="{node.y - 5:.1f}">{esc(node.placeholder)}</text>'
             f'{render_badge(x, node.y, "q", labels)}</g>'
         )
 
@@ -1935,20 +1958,17 @@ def render_nav(
             f'<a class="navbtn{active}"{nid}{aria} href="#{esc(item["target"])}" '
             f'data-section="{esc(item["target"])}">{esc(item["label"])}</a>'
         )
-    options = [f'<option value="all">{esc(search["all"])}</option>']
-    for key, section in sections.items():
-        options.append(f'<option value="{esc(key)}">{esc(section["title"])}</option>')
     return f"""<nav>
   <div class="wrap">
-    <div class="nav-links">{"".join(items)}</div>
-    <div class="nav-search" data-person-search data-no-results="{esc(search["no_results"])}" data-in-tree="{esc(search["in_tree"])}">
+    <div class="nav-bar">
+      <div class="nav-links">{"".join(items)}</div>
+      <button type="button" class="nav-search-toggle" data-nav-search-toggle aria-expanded="false" aria-controls="nav-search-panel" aria-label="{esc(search["open"])}"><svg class="nav-search-icon" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="5.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12.5 12.5L17 17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="nav-search" id="nav-search-panel" data-person-search data-no-results="{esc(search["no_results"])}" data-in-tree="{esc(search["in_tree"])}" hidden>
       <label class="sr-only" for="archive-search">{esc(search["label"])}</label>
       <div class="search-fields">
         <input id="archive-search" type="search" placeholder="{esc(search["placeholder"])}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="archive-results">
-        <label class="sr-only" for="archive-scope">Область поиска</label>
-        <select id="archive-scope" aria-label="Область поиска">
-          {"".join(options)}
-        </select>
+        <button type="button" class="search-close" data-search-close aria-label="{esc(search["close"])}"><span aria-hidden="true">×</span></button>
       </div>
       <div class="search-results" id="archive-results" role="listbox" aria-label="{esc(search["label"])}" hidden></div>
     </div>
@@ -2417,25 +2437,39 @@ def _render_related_people(
     ids: list[str],
     people: dict[str, Person],
     published: set[str],
+    children: bool = False,
 ) -> str:
-    """Names of relatives. A published person links to the stable card."""
-    if not ids:
-        return ""
+    """One compact row per relative; children with dates go oldest first."""
+    unique_ids = [pid for pid in dict.fromkeys(ids) if pid in people]
+    if children:
+        indexed = list(enumerate(unique_ids))
+
+        def child_order(item: tuple[int, str]) -> tuple[int, int, int]:
+            index, pid = item
+            year = year_only(people[pid].birt)
+            return (0, int(year), index) if year else (1, 0, index)
+
+        ordered_ids = [pid for _, pid in sorted(indexed, key=child_order)]
+    else:
+        ordered_ids = sorted(unique_ids, key=lambda item: _person_sort_key(item, people))
+
     items = []
-    for pid in sorted(dict.fromkeys(ids), key=lambda item: _person_sort_key(item, people)):
-        if pid not in people:
-            continue
+    for pid in ordered_ids:
         person = people[pid]
         brief = public_life_brief(person)
-        text = esc(person.display_name)
-        if brief:
-            text += f" ({esc(brief)})"
+        years = f'<span class="relative-years">{esc(brief)}</span>' if brief else ""
+        name = f'<span class="relative-name">{esc(person.display_name)}</span>'
         if pid in published:
-            text = f'<a href="#person-{esc(pid)}">{text}</a>'
-        items.append(f"<li>{text}</li>")
+            row = (
+                f'<a class="person-relative" href="#person-{esc(pid)}">'
+                f'{name}{years}<span class="relative-arrow" aria-hidden="true">→</span></a>'
+            )
+        else:
+            row = f'<div class="person-relative is-static">{name}{years}</div>'
+        items.append(f"<li>{row}</li>")
     if not items:
         return ""
-    return f"<ul>{''.join(items)}</ul>"
+    return f'<ul class="person-relatives">{"".join(items)}</ul>'
 
 
 def _render_related_links(
@@ -2492,10 +2526,17 @@ def render_person_card(
     on the record is the technical mark ``import``, not a citation.
     Empty rows are omitted; no biography is composed from the links.
     """
-    back = "".join(
-        f'<a href="#{esc(section_key)}-people">{esc(title)}</a>'
-        for section_key, title in section_links
-    )
+    back_links = []
+    for index, (section_key, title) in enumerate(section_links):
+        href = f"#{section_key}-people"
+        if index == 0:
+            back_links.append(
+                f'<a href="{esc(href)}" data-person-back data-default-href="{esc(href)}" '
+                f'data-default-label="← {esc(title)}">← {esc(title)}</a>'
+            )
+        else:
+            back_links.append(f'<a href="{esc(href)}">{esc(title)}</a>')
+    back = "".join(back_links)
     editorial_facts = []
     if not person.is_living:
         editorial_facts.append(
@@ -2509,18 +2550,21 @@ def render_person_card(
         if person.is_living:
             continue
         editorial_facts.append(_render_fact(label, esc(place)))
+    spouse_ids = [pid for pid in _spouse_ids(person, families) if pid in people]
+    spouse_label = "Супруг" if len(spouse_ids) == 1 else "Супруги"
     facts = "".join((
         _render_fact("Другие записанные фамилии", esc(", ".join(recorded_alternate_surnames(person)))),
         _render_fact("Статус", esc(content["tree"]["status"]["hyp"]) if person.is_hypothesis else ""),
-        _render_fact("Рождение", esc(public_birth(person))),
-        _render_fact("Смерть", esc(public_death(person))),
         _render_fact("Место рождения", esc(public_birth_place(person))),
         _render_fact("Место проживания", esc(public_residence(person))),
         _render_fact("Место смерти", esc(public_death_place(person))),
         *editorial_facts,
         _render_fact("Родители", _render_related_people(_parent_ids(person, families), people, published)),
-        _render_fact("Супруги", _render_related_people(_spouse_ids(person, families), people, published)),
-        _render_fact("Дети", _render_related_people(_child_ids(person, families), people, published)),
+        _render_fact(spouse_label, _render_related_people(spouse_ids, people, published)),
+        _render_fact(
+            "Дети",
+            _render_related_people(_child_ids(person, families), people, published, children=True),
+        ),
         _render_fact(
             "Братья и сёстры",
             _render_related_people(sibling_ids(person, people, families), people, published),
@@ -2534,11 +2578,15 @@ def render_person_card(
         tree_cards,
         content["archive_search"]["show_in_tree"],
     )
+    life = public_life_brief(person)
+    life_html = f'<p class="person-life">{esc(life)}</p>' if life else ""
     return (
         f'<article class="person-card" id="person-{esc(person.id)}" '
-        f'data-person-id="{esc(person.id)}">'
-        f'<div class="wrap"><p class="person-back">{back}</p>'
-        f"<h1>{esc(person.display_name)}</h1>{facts_html}{actions}</div></article>\n"
+        f'data-person-id="{esc(person.id)}"><div class="wrap"><div class="person-sheet">'
+        f'<div class="person-back">{back}</div>'
+        f'<div class="person-heading"><div class="person-photo-slot" data-person-photo-slot hidden></div>'
+        f'<div><h1>{esc(person.display_name)}</h1>{life_html}</div></div>'
+        f'{facts_html}{actions}</div></div></article>\n'
     )
 
 
@@ -2642,13 +2690,14 @@ def render_part_page(
     section_key: str,
     section: dict[str, Any],
     inner: str,
+    active_part: str,
 ) -> str:
     """One semantic part of a family section, with the same five-way navigation."""
     if not inner:
         return ""
     return (
         f'<div class="page" id="{esc(page_id)}">\n'
-        f"{render_section_nav(section_key, section)}{inner}</div>\n\n"
+        f"{render_section_nav(section_key, section, f'#{section_key}-{active_part}')}{inner}</div>\n\n"
     )
 
 
@@ -2692,19 +2741,30 @@ def render_home_page(content: dict[str, Any]) -> str:
     )
 
 
-def render_section_nav(section_key: str, section: dict[str, Any]) -> str:
-    """Five semantic parts. Chronicle stays reachable by its own anchor, not here."""
+def render_section_nav(
+    section_key: str,
+    section: dict[str, Any],
+    active_target: str = "",
+) -> str:
+    """Compact links to the five semantic parts, with the current part marked."""
     links = [
-        (f"#{section_key}-branches", "Родовые ветви"),
-        (f"#{section_key}-tree", "Генеалогическое древо"),
-        (f"#{section_key}-people", "Персоны"),
+        (f"#{section_key}-branches", "Ветви"),
+        (f"#{section_key}-tree", "Древо"),
+        (f"#{section_key}-people", "Люди"),
         (f"#{section_key}-sources", "Документы"),
-        (f"#{section_key}-places", "Географический указатель"),
+        (f"#{section_key}-places", "Места"),
     ]
     if section["gallery"]["photos"]:
-        links.append((f"#{section_key}-gallery", section["gallery"]["title"]))
-    items = "".join(f'<a href="{esc(target)}">{esc(label)}</a>' for target, label in links)
-    return f'<div class="section-nav"><div class="wrap">{items}</div></div>\n'
+        links.append((f"#{section_key}-gallery", "Фото"))
+    items = []
+    for target, label in links:
+        active = target == active_target
+        class_attr = ' class="active"' if active else ""
+        aria_attr = ' aria-current="page"' if active else ""
+        items.append(
+            f'<a{class_attr} href="{esc(target)}"{aria_attr}>{esc(label)}</a>'
+        )
+    return f'<div class="section-nav"><div class="wrap">{"".join(items)}</div></div>\n'
 
 
 def render_family_sources(
@@ -2737,7 +2797,7 @@ def render_family_sources(
         )
     return f"""<section class="src" id="{esc(section_key)}-sources">
   <div class="wrap">
-    <div class="sect-head">
+    <div class="sect-head legacy-anchor" id="{esc(section_key)}-timeline">
       <h2>{esc(sources["title"])}</h2>
       <div class="hr"></div>
     </div>
@@ -2856,8 +2916,8 @@ def render_family_gallery(section_key: str, gallery: dict[str, Any]) -> str:
 """
 
 
-def render_family_hub(section_key: str, section: dict[str, Any]) -> str:
-    """Short entrance to a family section. The materials live in their own parts."""
+def render_family_hub(section_key: str, section: dict[str, Any], archive: dict[str, Any]) -> str:
+    """Family entrance opens the branches directly, without an empty intermediate page."""
     return f"""<div class="page" id="{esc(section["page_id"])}">
 <section class="pagehead" id="{esc(section_key)}">
   <div class="wrap">
@@ -2865,7 +2925,8 @@ def render_family_hub(section_key: str, section: dict[str, Any]) -> str:
     <p class="sub">{esc(section["lead"])}</p>
   </div>
 </section>
-{render_section_nav(section_key, section)}</div>
+{render_section_nav(section_key, section, f"#{section_key}-branches")}
+{render_family_branches(section_key, section, archive)}</div>
 
 """
 
@@ -2910,29 +2971,23 @@ def render_tree_page(
     section: dict[str, Any],
     tree: dict[str, Any],
     pedigree_svg: str,
-    archive_search: dict[str, Any],
 ) -> str:
-    """One pedigree with scoped public search and independent view controls."""
+    """One pedigree with local positioning search and independent view controls."""
     search = tree["search"]
     controls = tree["controls"]
     search_id = f"search-{section_key}"
     results_id = f"results-{section_key}"
     return f"""<div class="page page-tree" id="{esc(section["tree_page_id"])}">
 <div class="tree-stack" id="{esc(section_key)}-tree">
-{render_section_nav(section_key, section)}
+{render_section_nav(section_key, section, f"#{section_key}-tree")}
 <section class="pagehead tree-pagehead">
   <div class="wrap">
     <h1>{esc(section["tree_title"])}</h1>
     <div class="tree-toolbar">
-      <div class="tree-search" data-search-tree="{esc(section_key)}" data-no-results="{esc(search["no_results"])}" data-no-results-all="{esc(archive_search["no_results"])}" data-in-tree="{esc(archive_search["in_tree"])}">
+      <div class="tree-search" data-search-tree="{esc(section_key)}" data-no-results="{esc(search["no_results"])}">
         <label class="sr-only" for="{search_id}">{esc(search["label"])}</label>
         <div class="search-fields">
           <input id="{search_id}" type="search" placeholder="{esc(search["placeholder"])}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{results_id}">
-          <label class="sr-only" for="scope-{section_key}">Область поиска</label>
-          <select id="scope-{section_key}" aria-label="Область поиска">
-            <option value="local">{esc(search["local"])}</option>
-            <option value="global">{esc(search["global"])}</option>
-          </select>
         </div>
         <div class="search-results" id="{results_id}" role="listbox" aria-label="{esc(search["label"])}" hidden></div>
       </div>
@@ -2940,8 +2995,9 @@ def render_tree_page(
         <button type="button" data-tree-action="zoom-out" aria-label="{esc(controls["zoom_out"])}" title="{esc(controls["zoom_out"])}">−</button>
         <output data-zoom-value aria-live="polite" aria-label="Текущий масштаб">100%</output>
         <button type="button" data-tree-action="zoom-in" aria-label="{esc(controls["zoom_in"])}" title="{esc(controls["zoom_in"])}">+</button>
-        <button type="button" class="tree-view-button" data-tree-action="fit">{esc(controls["fit"])}</button>
-        <button type="button" class="tree-view-button" data-tree-action="reset">{esc(controls["reset"])}</button>
+        <button type="button" class="tree-view-button" data-tree-action="fit" aria-label="{esc(controls["fit"])}" title="{esc(controls["fit"])}"><svg class="tree-control-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+        <button type="button" class="tree-view-button" data-tree-action="reset" aria-label="{esc(controls["reset"])}" title="{esc(controls["reset"])}"><svg class="tree-control-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></svg></button>
+        <button type="button" class="tree-view-button" data-tree-action="fullscreen" aria-label="{esc(controls["fullscreen"])}" title="{esc(controls["fullscreen"])}" aria-pressed="false" data-label-enter="{esc(controls["fullscreen"])}" data-label-exit="{esc(controls["exit_fullscreen"])}"><svg class="tree-control-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 3H3v5M3 3l6 6M16 3h5v5M21 3l-6 6M21 16v5h-5M21 21l-6-6M3 16v5h5M3 21l6-6"/></svg></button>
       </div>
     </div>
     <details class="legend">
@@ -2983,6 +3039,11 @@ def render_page_script() -> str:
 var cachedNavH = 56;
 var treeViews = {};
 var pendingTreeFocus = null;
+var currentRouteHash = window.location.hash || '#top';
+var pendingPersonSearchReturn = null;
+var activePersonSearchReturn = null;
+var personReturnContexts = {};
+var navSearchRestore = null;
 
 function measureNavHeight() {
   var nav = document.querySelector('nav');
@@ -3059,10 +3120,35 @@ function resetTree(view) {
   view.wrap.scrollTop = 0;
 }
 
+function setTreeFullscreen(view, open) {
+  var active = Boolean(open && view);
+  document.body.classList.toggle('tree-fullscreen', active);
+  document.querySelectorAll('[data-tree-action="fullscreen"]').forEach(function(button) {
+    var pressed = active && button.closest('[data-controls-tree]').getAttribute('data-controls-tree') === view.key;
+    var label = button.getAttribute(pressed ? 'data-label-exit' : 'data-label-enter');
+    button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', label);
+  });
+  if (active) {
+    window.scrollTo(0, 0);
+    view.wrap.focus({preventScroll: true});
+  } else {
+    measureNavHeight();
+  }
+}
+
 function clearTreeHighlight() {
   document.querySelectorAll('.pedigree .search-hit').forEach(function(card) {
     card.classList.remove('search-hit');
   });
+}
+
+function selectTreeCard(card) {
+  document.querySelectorAll('.pedigree .selected').forEach(function(selected) {
+    selected.classList.remove('selected');
+  });
+  if (card) card.classList.add('selected');
 }
 
 function focusTreeCard(focus) {
@@ -3089,8 +3175,10 @@ function focusTreeCard(focus) {
   });
 }
 
-function openPerson(id) {
+function openPerson(id, card) {
   if (!id) return;
+  selectTreeCard(card);
+  setTreeFullscreen(null, false);
   if (window.location.hash === '#person-' + id) resolveRoute();
   else window.location.hash = 'person-' + id;
 }
@@ -3125,6 +3213,9 @@ function initTree(wrap) {
   };
   treeViews[view.key] = view;
   applyTreeScale(view, 1);
+  svg.querySelectorAll('a.bx[data-person-id]').forEach(function(card) {
+    card.addEventListener('click', function() { selectTreeCard(card); });
+  });
 
   var controls = document.querySelector('[data-controls-tree="' + view.key + '"]');
   if (controls) {
@@ -3135,6 +3226,7 @@ function initTree(wrap) {
         if (action === 'zoom-out') zoomTree(view, 0.8);
         if (action === 'fit') fitTree(view);
         if (action === 'reset') resetTree(view);
+        if (action === 'fullscreen') setTreeFullscreen(view, !document.body.classList.contains('tree-fullscreen'));
       });
     });
   }
@@ -3208,7 +3300,7 @@ function initTree(wrap) {
     if (tap && event.pointerId === tap.id && !tap.moved && pointers.size === 1) {
       var hit = document.elementFromPoint(event.clientX, event.clientY);
       var node = hit && hit.closest && hit.closest('a.bx[data-person-id]');
-      if (node) openPerson(node.getAttribute('data-person-id'));
+      if (node) openPerson(node.getAttribute('data-person-id'), node);
     }
     if (tap && event.pointerId === tap.id) tap = null;
     pointers.delete(event.pointerId);
@@ -3227,7 +3319,67 @@ function initTree(wrap) {
 }
 
 """ + search_js + """
+function configurePersonBack(card, previousHash) {
+  var link = card.querySelector('[data-person-back]');
+  if (!link) return;
+  link.href = link.getAttribute('data-default-href');
+  link.textContent = link.getAttribute('data-default-label');
+  link.removeAttribute('data-return-search');
+  link.removeAttribute('data-return-history');
+  link.removeAttribute('data-show-tree');
+  link.removeAttribute('data-card-id');
+  activePersonSearchReturn = null;
+
+  var context = personReturnContexts[card.id];
+  if (pendingPersonSearchReturn) {
+    context = {type: 'search', hash: pendingPersonSearchReturn.hash, query: pendingPersonSearchReturn.query};
+    personReturnContexts[card.id] = context;
+    pendingPersonSearchReturn = null;
+  } else if (!context && previousHash && previousHash !== '#' + card.id && previousHash !== '#top') {
+    var type = previousHash.indexOf('#person-') === 0 ? 'person' : 'other';
+    if (/^#(matyukhiny|skiba)-tree$/.test(previousHash)) type = 'tree';
+    context = {type: type, hash: previousHash};
+    personReturnContexts[card.id] = context;
+  }
+  if (!context) return;
+
+  link.href = context.hash;
+  if (context.type === 'search') {
+    activePersonSearchReturn = context;
+    link.textContent = '← К результатам поиска';
+    link.setAttribute('data-return-search', 'true');
+  } else if (context.type === 'person') {
+    link.textContent = '← Назад';
+    link.setAttribute('data-return-history', 'true');
+  } else if (context.type === 'tree') {
+    var tree = context.hash.slice(1, -5);
+    var wrap = document.querySelector('[data-tree="' + tree + '"]');
+    var personId = card.getAttribute('data-person-id');
+    var treeCard = wrap && Array.from(wrap.querySelectorAll('a.bx[data-person-id]')).find(function(node) {
+      return node.getAttribute('data-person-id') === personId;
+    });
+    link.textContent = '← К древу';
+    if (treeCard) {
+      link.setAttribute('data-show-tree', tree);
+      link.setAttribute('data-card-id', treeCard.id);
+    }
+  } else {
+    link.textContent = '← Назад';
+  }
+}
+
+function restoreNavSearchResults(context) {
+  var search = document.querySelector('[data-person-search]');
+  if (!search) return;
+  var input = search.querySelector('input');
+  setNavSearchOpen(search, true);
+  input.value = context.query;
+  renderNavResults(search);
+  input.focus();
+}
+
 function resolveRoute() {
+  var previousHash = currentRouteHash;
   var hash = window.location.hash.slice(1) || 'top';
   var target = document.getElementById(hash);
   if (!target) {
@@ -3239,6 +3391,13 @@ function resolveRoute() {
   document.querySelectorAll('.page').forEach(function(candidate) {
     candidate.classList.toggle('visible', candidate === page);
   });
+  if (hash.indexOf('person-') === 0) configurePersonBack(target, previousHash);
+  currentRouteHash = '#' + hash;
+  if (navSearchRestore) {
+    var searchContext = navSearchRestore;
+    navSearchRestore = null;
+    requestAnimationFrame(function() { restoreNavSearchResults(searchContext); });
+  }
   var current = 'about';
   if (hash.indexOf('person-') === 0) current = '';
   if (hash.indexOf('matyukhiny') === 0) current = 'matyukhiny';
@@ -3283,7 +3442,26 @@ function resolveRoute() {
 document.querySelectorAll('.treewrap').forEach(initTree);
 document.querySelectorAll('.tree-search').forEach(initSearch);
 document.querySelectorAll('[data-person-search]').forEach(initPersonSearch);
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'Escape' && document.body.classList.contains('tree-fullscreen')) {
+    setTreeFullscreen(null, false);
+  }
+});
 document.addEventListener('click', function(event) {
+  var historyReturn = event.target.closest('[data-return-history]');
+  if (historyReturn && window.history.length > 1) {
+    event.preventDefault();
+    window.history.back();
+    return;
+  }
+  var searchReturn = event.target.closest('[data-return-search]');
+  if (searchReturn && activePersonSearchReturn) {
+    event.preventDefault();
+    navSearchRestore = activePersonSearchReturn;
+    if (window.location.hash === activePersonSearchReturn.hash) resolveRoute();
+    else window.location.hash = activePersonSearchReturn.hash;
+    return;
+  }
   var link = event.target.closest('[data-show-tree]');
   if (!link) return;
   event.preventDefault();
@@ -3346,18 +3524,13 @@ def build_html(
             people[pid]
             for pid in sorted(section_ids[section_key], key=lambda item: _person_sort_key(item, people))
         ]
-        parts.append(render_family_hub(section_key, section))
-        parts.append(render_part_page(
-            f"page-{section_key}-branches",
-            section_key,
-            section,
-            render_family_branches(section_key, section, content["archive"]),
-        ))
+        parts.append(render_family_hub(section_key, section, content["archive"]))
         parts.append(render_part_page(
             f"page-{section_key}-people",
             section_key,
             section,
             render_family_people(section_key, listed),
+            "people",
         ))
         parts.append(render_part_page(
             f"page-{section_key}-sources",
@@ -3369,6 +3542,7 @@ def build_html(
                 people,
                 section_ids[section_key],
             ),
+            "sources",
         ))
         parts.append(render_part_page(
             f"page-{section_key}-places",
@@ -3381,12 +3555,7 @@ def build_html(
                 people,
                 section_ids[section_key],
             ),
-        ))
-        parts.append(render_part_page(
-            f"page-{section_key}-timeline",
-            section_key,
-            section,
-            render_family_chronicle(section_key, section["chronicle"]),
+            "places",
         ))
         gallery = render_family_gallery(section_key, section["gallery"])
         if gallery:
@@ -3395,6 +3564,7 @@ def build_html(
                 section_key,
                 section,
                 gallery,
+                "gallery",
             ))
 
     tree_cards: dict[str, dict[str, str]] = {}
@@ -3421,7 +3591,6 @@ def build_html(
                 section,
                 content["tree"],
                 pedigree_svg,
-                content["archive_search"],
             )
         )
 
