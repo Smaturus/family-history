@@ -15,7 +15,7 @@ import yaml
 
 import pytest
 
-from build_site import person_search_text
+from build_site import person_search_text, recorded_alternate_surnames
 from parse_data import Person, direct_lines, format_date, load_family
 
 REPO = Path(__file__).resolve().parents[1]
@@ -230,6 +230,161 @@ def test_search_does_not_publish_private_notes(tmp_path):
     code, log, html = build_in_tmp(tmp_path, data=data)
     assert code == 0, log
     assert "Закрытая служебная пометка" not in html
+
+
+def test_recorded_alternate_surnames_use_only_written_forms():
+    """Скобки и косая черта — уже записанные фамилии, не девичья фамилия из отчества."""
+    maidenish = Person(id="alt1", givn="Зинаида", surn="Захарченкова(Захарченко?)", sex="F")
+    assert recorded_alternate_surnames(maidenish) == ["Захарченко?"]
+    compound = Person(id="alt2", givn="Григорий", surn="Захаров/Алексеев", sex="M")
+    assert recorded_alternate_surnames(compound) == ["Захаров", "Алексеев"]
+    several = Person(id="alt3", givn="Марта", surn="Чернова (Перова, Кузнецова)", sex="F")
+    assert recorded_alternate_surnames(several) == ["Перова", "Кузнецова"]
+    patronymic = Person(id="alt4", givn="Спиридон Ермилович(Ермолаевич)", surn="Захаров", sex="M")
+    assert recorded_alternate_surnames(patronymic) == []
+
+
+def test_home_cover_keeps_hero_and_drops_branch_blurbs(tmp_path):
+    """Главная — обложка: первый экран и текст об основателе, без описания ветвей."""
+    code, log, html = build_in_tmp(tmp_path)
+    assert code == 0, log
+    page = html.split('id="page1"', 1)[1].split('id="page-matyukhiny"', 1)[0]
+    assert "Структура поколений" in page
+    assert "Реконструкция<br>в пространстве и времени" in page
+    assert "Исследовать архив" in page
+    assert "Исследование семейной истории начал Эдуард Алексеевич Скиба в начале 2000-х годов." in page
+    assert "Его работу продолжили дочь и внучка." in page
+    assert "Мокрое, Дмитров и Долгопрудный." not in page
+    assert "Донбасс, Валдай и Татария." not in page
+    assert "Хроника" not in page
+    assert 'type="search"' not in page
+
+
+def test_family_parts_keep_direct_links_and_demote_chronicle(tmp_path):
+    """Пять частей раздела — отдельные страницы; хроника остаётся, но не в основной навигации."""
+    code, log, html = build_in_tmp(tmp_path)
+    assert code == 0, log
+    for key in ("matyukhiny", "skiba"):
+        assert f'id="{key}"' in html
+        for suffix in ("branches", "tree", "people", "sources", "places"):
+            assert f'id="{key}-{suffix}"' in html
+            assert f'href="#{key}-{suffix}"' in html
+        assert f'id="{key}-timeline"' in html
+        assert f'href="#{key}-timeline"' not in html
+        assert f'id="{key}-gallery"' not in html
+    assert "Связь семьи из ревизской сказки 1834 года" in html
+    assert "Две семьи Алексеевых не являются родственными." in html
+    assert "Архивные направления" not in html
+    assert "Родина Надежды Астафьевой" not in html
+    assert "Здесь родились Григорий Скиба" not in html
+    assert "В записи прямой линии указаны" not in html
+    assert 'id="page2"' in html and 'id="page3"' in html
+
+
+def test_person_card_id_and_collateral_sibling(tmp_path):
+    """Карточка адресуется id персоны. Брат вне древа публикуется, человек без связей — нет."""
+    data = fixture_data()
+    data["persons"].append({
+        "id": "t09",
+        "surname": "Тестов",
+        "name": "Павел Иванович",
+        "birth": "1942",
+        "death": "2001",
+        "sex": "M",
+        "deceased": True,
+        "status": "ok",
+        "father": "t04",
+        "mother": "t05",
+        "place": "город Примерск",
+    })
+    data["persons"].append({
+        "id": "t99",
+        "surname": "Непубличный",
+        "name": "Человек",
+        "birth": "1900",
+        "deceased": True,
+        "status": "ok",
+    })
+    code, log, html = build_in_tmp(tmp_path, data=data)
+    assert code == 0, log
+    assert 'id="person-t01"' in html
+    assert "Показать в древе" in html
+    assert 'id="person-t09"' in html
+    assert 'href="#person-t09"' in html
+    assert "город Примерск" in html
+    assert 'id="pedigree-t09"' not in html
+    assert 'id="pedigree-skiba-t09"' not in html
+    assert "Непубличный" not in html
+    card = html.split('id="person-t01"', 1)[1].split('id="person-', 1)[0]
+    assert "1971" in card
+    assert "Место рождения" not in card
+    assert "Смерть" not in card
+    assert "Закрытая" not in card
+    assert "Показать в древе" in card
+    assert 'href="#person-t04"' in card
+    assert 'data-card-id="pedigree-t01"' in card
+    bare = html.split('id="person-t07"', 1)[1].split('id="person-', 1)[0]
+    assert "даты неизвестны" not in bare
+    assert "<dt></dt>" not in html
+    sibling = html.split('id="person-t09"', 1)[1].split('id="person-', 1)[0]
+    assert "Показать в древе" not in sibling
+    assert "город Примерск" in sibling
+
+
+def test_public_search_index_links_cards_and_keeps_private_fields_out(tmp_path):
+    """Глобальный индекс: публичные люди, альтернативная фамилия, без мест и заметок."""
+    data = fixture_data()
+    data["persons"].append({
+        "id": "t09",
+        "surname": "Захаров/Алексеев",
+        "name": "Григорий",
+        "birth": "1912",
+        "death": "1988",
+        "sex": "M",
+        "deceased": True,
+        "status": "ok",
+        "father": "t04",
+        "mother": "t05",
+        "place": "город Примерск",
+        "note": "Закрытая служебная пометка",
+    })
+    code, log, html = build_in_tmp(tmp_path, data=data)
+    assert code == 0, log
+    page = html.split('id="page1"', 1)[1].split('id="page-matyukhiny"', 1)[0]
+    assert 'type="search"' not in page
+    assert 'id="archive-search"' in html
+    assert 'data-person-search' in html
+    blob = html.split('id="person-index">', 1)[1].split("</script>", 1)[0]
+    import json
+    records = json.loads(blob)
+    by_id = {item["id"]: item for item in records}
+    assert "t99" not in by_id
+    assert "t09" in by_id
+    assert "t01" in by_id
+    allowed = {"id", "name", "search", "years", "sections", "trees"}
+    assert set(by_id["t01"]) == allowed
+    assert by_id["t01"]["years"] == "р. 1971"
+    assert "Закрытая служебная пометка" not in html
+    assert "Примерск" not in blob
+    assert "Закрытая служебная пометка" not in blob
+    assert "Захаров" in by_id["t09"]["search"]
+    assert "Алексеев" in by_id["t09"]["search"]
+    assert by_id["t09"]["trees"] == []
+    assert any(tree["card"] == "pedigree-t01" for tree in by_id["t01"]["trees"])
+    card = html.split('id="person-t09"', 1)[1].split('id="person-', 1)[0]
+    assert 'href="#person-t01"' in card
+    assert "Показать в древе" not in card
+    assert "Место рождения" in card
+    assert "город Примерск" in card
+    css = (REPO / "assets" / "site.css").read_text(encoding="utf-8")
+    face = css.split(".pedigree .fr{")[1].split("}")[0]
+    assert "var(" not in face
+    assert "#F8F9FB" in face
+    assert "forced-color-adjust:none" in css
+    assert "color-scheme:light" in css
+    assert "applyTreeScale(view, 1)" in html
+    assert 'stroke="#22252B"' not in html
+    assert 'fill="#22252B"' in html
 
 
 def test_build_fails_cleanly_without_data(tmp_path):

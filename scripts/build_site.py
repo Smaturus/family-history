@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import html
+import json
 import math
 import random
 import re
@@ -18,6 +19,7 @@ from collections import Counter
 from parse_data import (
     Family,
     Person,
+    canonical_place,
     counted,
     direct_lines,
     format_date,
@@ -265,16 +267,20 @@ def require_str(data: Any, path: str) -> str:
 
 def validate_branch(branch: Any, path: str) -> None:
     branch = require_mapping(branch, path)
-    require_keys(branch, path, ["tag", "title", "basis", "geography", "paragraphs"])
-    require_list(branch["paragraphs"], f"{path}.paragraphs", min_len=1)
-    for key in ("tag", "title", "basis", "geography"):
+    require_keys(branch, path, ["tag", "title", "basis", "paragraphs"])
+    require_list(branch["paragraphs"], f"{path}.paragraphs")
+    for key in ("tag", "title", "basis"):
         require_str(branch[key], f"{path}.{key}")
 
 
 def validate_content(content: Any) -> None:
     """Schema checks for editor-facing YAML used by the generator."""
     content = require_mapping(content, "root")
-    require_keys(content, "root", ["meta", "hero", "about", "archive", "sections", "tree", "footer"])
+    require_keys(
+        content,
+        "root",
+        ["meta", "hero", "about", "archive", "archive_search", "sections", "tree", "footer"],
+    )
 
     meta = require_mapping(content["meta"], "meta")
     require_keys(meta, "meta", ["title", "brand", "nav_items"])
@@ -300,6 +306,15 @@ def validate_content(content: Any) -> None:
     require_keys(archive, "archive", ["label", "title", "entry_link", "tree_link"])
     for key in ("label", "title", "entry_link", "tree_link"):
         require_str(archive[key], f"archive.{key}")
+
+    archive_search = require_mapping(content["archive_search"], "archive_search")
+    require_keys(
+        archive_search,
+        "archive_search",
+        ["label", "placeholder", "all", "no_results", "in_tree", "show_in_tree"],
+    )
+    for key in ("label", "placeholder", "all", "no_results", "in_tree", "show_in_tree"):
+        require_str(archive_search[key], f"archive_search.{key}")
 
     sections = require_mapping(content["sections"], "sections")
     require_keys(sections, "sections", ["matyukhiny", "skiba"])
@@ -339,26 +354,27 @@ def validate_content(content: Any) -> None:
                 validate_branch(item, f"{path}.collateral.items[{index}]")
 
         sources = require_mapping(section["sources"], f"{path}.sources")
-        require_keys(sources, f"{path}.sources", ["label", "title", "items", "archives_title", "archives"])
+        require_keys(sources, f"{path}.sources", ["label", "title", "items"])
         require_str(sources["label"], f"{path}.sources.label")
         require_str(sources["title"], f"{path}.sources.title")
-        require_str(sources["archives_title"], f"{path}.sources.archives_title")
         items = require_list(sources["items"], f"{path}.sources.items", min_len=1)
         for index, item in enumerate(items):
             item_path = f"{path}.sources.items[{index}]"
             item = require_mapping(item, item_path)
-            require_keys(item, item_path, ["kind", "title"])
-            require_str(item["kind"], f"{item_path}.kind")
-            require_str(item["title"], f"{item_path}.title")
+            require_keys(item, item_path, ["id", "kind", "title"])
+            for key in ("id", "kind", "title"):
+                require_str(item[key], f"{item_path}.{key}")
             for optional in ("date", "reference"):
                 if optional in item:
                     require_str(item[optional], f"{item_path}.{optional}")
             if "paragraphs" in item:
                 require_list(item["paragraphs"], f"{item_path}.paragraphs")
+            if "people" in item:
+                for person_id in require_list(item["people"], f"{item_path}.people"):
+                    require_str(person_id, f"{item_path}.people[]")
             if "image" in item:
                 image = require_mapping(item["image"], f"{item_path}.image")
                 require_keys(image, f"{item_path}.image", ["src", "alt"])
-        require_list(sources["archives"], f"{path}.sources.archives")
 
         places = require_mapping(section["places"], f"{path}.places")
         require_keys(places, f"{path}.places", ["label", "title", "items"])
@@ -368,9 +384,24 @@ def validate_content(content: Any) -> None:
         for index, item in enumerate(items):
             item_path = f"{path}.places.items[{index}]"
             item = require_mapping(item, item_path)
-            require_keys(item, item_path, ["name", "note"])
-            require_str(item["name"], f"{item_path}.name")
-            require_str(item["note"], f"{item_path}.note")
+            require_keys(item, item_path, ["id", "name"])
+            for key in ("id", "name"):
+                require_str(item[key], f"{item_path}.{key}")
+            for optional in ("match", "note"):
+                if optional in item:
+                    require_str(item[optional], f"{item_path}.{optional}")
+            if "people" in item:
+                for person_index, person in enumerate(
+                    require_list(item["people"], f"{item_path}.people")
+                ):
+                    person_path = f"{item_path}.people[{person_index}]"
+                    person = require_mapping(person, person_path)
+                    require_keys(person, person_path, ["id", "relation"])
+                    require_str(person["id"], f"{person_path}.id")
+                    require_str(person["relation"], f"{person_path}.relation")
+            if "documents" in item:
+                for document_id in require_list(item["documents"], f"{item_path}.documents"):
+                    require_str(document_id, f"{item_path}.documents[]")
 
         chronicle = require_mapping(section["chronicle"], f"{path}.chronicle")
         require_keys(chronicle, f"{path}.chronicle", ["label", "title", "events"])
@@ -396,6 +427,11 @@ def validate_content(content: Any) -> None:
             require_keys(photo, photo_path, ["src", "alt"])
             require_str(photo["src"], f"{photo_path}.src")
             require_str(photo["alt"], f"{photo_path}.alt")
+
+    if "person_biographies" in content:
+        biographies = require_mapping(content["person_biographies"], "person_biographies")
+        for person_id, text in biographies.items():
+            require_str(text, f"person_biographies.{person_id}")
 
     tree = require_mapping(content["tree"], "tree")
     require_keys(
@@ -608,10 +644,14 @@ def render_badge(x: float, cy: float, status: str, labels: dict[str, str]) -> st
     if status == "ok":
         return ""
     width = STATUS_BADGE_W[status]
+    if status == "hyp":
+        bg_fill, text_fill = "rgba(111,102,144,.10)", "#6F6690"
+    else:
+        bg_fill, text_fill = "rgba(34,37,43,.05)", "#454A55"
     return (
-        f'<rect class="bg" x="{x + 12}" y="{cy + 18:.1f}" width="{width}" '
+        f'<rect class="bg" fill="{bg_fill}" x="{x + 12}" y="{cy + 18:.1f}" width="{width}" '
         f'height="{BADGE_H}" rx="{BADGE_H / 2}"/>'
-        f'<text class="bdg" x="{x + 12 + width / 2:.1f}" y="{cy + 29.4:.1f}" '
+        f'<text class="bdg" fill="{text_fill}" x="{x + 12 + width / 2:.1f}" y="{cy + 29.4:.1f}" '
         f'text-anchor="middle">{esc(labels[status])}</text>'
     )
 
@@ -666,6 +706,25 @@ def person_search_text(person: Person) -> str:
     return " | ".join(sorted(form for form in forms if form))
 
 
+def _box_paint(classes: list[str]) -> tuple[str, str]:
+    """sRGB face and border. Kept equal to the pedigree CSS literals.
+
+    Custom properties are not used here: when the SVG viewport is resized,
+    a variable on the rectangle and a variable on the text can resolve apart,
+    so a light face ends up under light text.
+    """
+    fill = "#E6E9EE" if "me" in classes else "#F8F9FB"
+    if "hyp" in classes:
+        stroke = "#6F6690"
+    elif "me" in classes:
+        stroke = "#454A55"
+    elif "ok" in classes:
+        stroke = "#6A7686"
+    else:
+        stroke = "#B4BBC6"
+    return fill, stroke
+
+
 def render_person_box(
     x: float,
     cy: float,
@@ -688,16 +747,18 @@ def render_person_box(
     years = person.public_years.replace("р. ", "").replace("ум. ", "† ")
     if years == "? – ?":
         years = "даты неизвестны"
+    fill, stroke = _box_paint(classes)
 
     return (
-        f'<g id="{esc(card_id)}" class="{" ".join(classes)}" '
+        f'<a id="{esc(card_id)}" class="{" ".join(classes)}" href="#person-{esc(person.id)}" '
         f'data-person-id="{esc(person.id)}" data-search="{esc(person_search_text(person))}" '
         f'data-years="{esc(person.public_years)}">'
-        f'<rect class="fr" x="{x}" y="{cy - BOX_H / 2:.1f}" width="{BOX_W}" height="{BOX_H}" rx="10"/>'
-        f'<text class="t1" x="{x + 12}" y="{cy - 22:.1f}">{esc(surname)}</text>'
-        f'<text class="t2" x="{x + 12}" y="{cy - 5:.1f}">{esc(given)}</text>'
-        f'<text class="t3" x="{x + 12}" y="{cy + 13:.1f}">{esc(years)}</text>'
-        f'{render_badge(x, cy, status, labels)}</g>'
+        f'<rect class="fr" fill="{fill}" stroke="{stroke}" x="{x}" y="{cy - BOX_H / 2:.1f}" '
+        f'width="{BOX_W}" height="{BOX_H}" rx="10"/>'
+        f'<text class="t1" fill="#22252B" x="{x + 12}" y="{cy - 22:.1f}">{esc(surname)}</text>'
+        f'<text class="t2" fill="#22252B" x="{x + 12}" y="{cy - 5:.1f}">{esc(given)}</text>'
+        f'<text class="t3" fill="#454A55" x="{x + 12}" y="{cy + 13:.1f}">{esc(years)}</text>'
+        f'{render_badge(x, cy, status, labels)}</a>'
     )
 
 
@@ -707,10 +768,10 @@ def render_box(node: TreeNode, labels: dict[str, str], id_prefix: str) -> str:
     if node.is_missing:
         return (
             f'<g class="bx q">'
-            f'<rect class="fr" x="{x}" y="{node.y - BOX_H / 2:.1f}" '
+            f'<rect class="fr" fill="none" stroke="#B4BBC6" x="{x}" y="{node.y - BOX_H / 2:.1f}" '
             f'width="{BOX_W}" height="{BOX_H}" rx="10"/>'
-            f'<text class="t1" x="{x + 12}" y="{node.y - 22:.1f}">—</text>'
-            f'<text class="t2" x="{x + 12}" y="{node.y - 5:.1f}">{esc(node.placeholder)}</text>'
+            f'<text class="t1" fill="#565B66" x="{x + 12}" y="{node.y - 22:.1f}">—</text>'
+            f'<text class="t2" fill="#565B66" x="{x + 12}" y="{node.y - 5:.1f}">{esc(node.placeholder)}</text>'
             f'{render_badge(x, node.y, "q", labels)}</g>'
         )
 
@@ -790,7 +851,8 @@ def render_pedigree_svg(
     height = max(node.y for node in nodes) + ROW_H
 
     return (
-        f'<svg class="pedigree" viewBox="0 0 {width} {height:.0f}" '
+        f'<svg class="pedigree" style="color-scheme:light;forced-color-adjust:none" '
+        f'viewBox="0 0 {width} {height:.0f}" '
         f'width="{width}" height="{height:.0f}" '
         f'xmlns="http://www.w3.org/2000/svg" '
         f'role="img" aria-labelledby="{id_prefix}-title {id_prefix}-desc">'
@@ -813,8 +875,7 @@ def branch_card(
     return (
         f'<article class="card"><div class="tag">{esc(branch["tag"])}</div>'
         f'<h3>{esc(branch["title"])}</h3>'
-        f'<div class="basis">{esc(branch["basis"])}</div>{body}'
-        f'<div class="geography">{esc(branch["geography"])}</div>{link}</article>'
+        f'<div class="basis">{esc(branch["basis"])}</div>{body}{link}</article>'
     )
 
 
@@ -1858,8 +1919,12 @@ def render_document_start(meta_content: dict[str, Any], css: str) -> str:
 """
 
 
-def render_nav(meta_content: dict[str, Any]) -> str:
-    """Top-level links to the project note and the two family sections."""
+def render_nav(
+    meta_content: dict[str, Any],
+    search: dict[str, Any],
+    sections: dict[str, Any],
+) -> str:
+    """Section links plus archive search. The search is outside the home page."""
     items = []
     for index, item in enumerate(meta_content["nav_items"]):
         active = " active" if index == 0 else ""
@@ -1869,9 +1934,23 @@ def render_nav(meta_content: dict[str, Any]) -> str:
             f'<a class="navbtn{active}"{nid}{aria} href="#{esc(item["target"])}" '
             f'data-section="{esc(item["target"])}">{esc(item["label"])}</a>'
         )
+    options = [f'<option value="all">{esc(search["all"])}</option>']
+    for key, section in sections.items():
+        options.append(f'<option value="{esc(key)}">{esc(section["title"])}</option>')
     return f"""<nav>
   <div class="wrap">
     <div class="nav-links">{"".join(items)}</div>
+    <div class="nav-search" data-person-search data-no-results="{esc(search["no_results"])}" data-in-tree="{esc(search["in_tree"])}">
+      <label class="sr-only" for="archive-search">{esc(search["label"])}</label>
+      <div class="search-fields">
+        <input id="archive-search" type="search" placeholder="{esc(search["placeholder"])}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="archive-results">
+        <label class="sr-only" for="archive-scope">Область поиска</label>
+        <select id="archive-scope" aria-label="Область поиска">
+          {"".join(options)}
+        </select>
+      </div>
+      <div class="search-results" id="archive-results" role="listbox" aria-label="{esc(search["label"])}" hidden></div>
+    </div>
   </div>
 </nav>
 
@@ -2130,14 +2209,459 @@ def render_sources_section(sources: dict[str, Any], st: dict[str, Any]) -> str:
 """
 
 
+def _parent_ids(person: Person, families: dict[str, Family]) -> list[str]:
+    if not person.famc or person.famc not in families:
+        return []
+    family = families[person.famc]
+    return [pid for pid in (family.husb, family.wife) if pid]
+
+
+def _child_ids(person: Person, families: dict[str, Family]) -> list[str]:
+    children: list[str] = []
+    for family_id in person.fams:
+        children.extend(families[family_id].chil)
+    return list(dict.fromkeys(children))
+
+
+def _spouse_ids(person: Person, families: dict[str, Family]) -> list[str]:
+    spouses: list[str] = []
+    for family_id in person.fams:
+        family = families[family_id]
+        other = family.wife if family.husb == person.id else family.husb
+        if other:
+            spouses.append(other)
+    return list(dict.fromkeys(spouses))
+
+
+def ancestor_ids(
+    anchor_id: str,
+    people: dict[str, Person],
+    families: dict[str, Family],
+) -> set[str]:
+    """Anchor and ancestors already stored as parent links."""
+    seen: set[str] = set()
+    stack = [anchor_id]
+    while stack:
+        pid = stack.pop()
+        if pid in seen or pid not in people:
+            continue
+        seen.add(pid)
+        stack.extend(_parent_ids(people[pid], families))
+    return seen
+
+
+def descendant_ids(
+    roots: set[str],
+    people: dict[str, Person],
+    families: dict[str, Family],
+) -> set[str]:
+    """Roots plus descendants already stored as child links."""
+    seen = {pid for pid in roots if pid in people}
+    stack = list(seen)
+    while stack:
+        pid = stack.pop()
+        for child_id in _child_ids(people[pid], families):
+            if child_id in people and child_id not in seen:
+                seen.add(child_id)
+                stack.append(child_id)
+    return seen
+
+
+def section_person_ids(
+    anchor_id: str,
+    people: dict[str, Person],
+    families: dict[str, Family],
+) -> set[str]:
+    """Blood of one section anchor, plus spouses of those people.
+
+    Walking only up from the anchor and then down from those ancestors keeps
+    siblings, other descendants and collateral kin. A spouse is included once;
+    the spouse's own parents stay in their section instead of being inferred.
+    """
+    blood = descendant_ids(ancestor_ids(anchor_id, people, families), people, families)
+    spouses: set[str] = set()
+    for pid in blood:
+        spouses.update(sid for sid in _spouse_ids(people[pid], families) if sid in people)
+    return blood | spouses
+
+
+def sibling_ids(
+    person: Person,
+    people: dict[str, Person],
+    families: dict[str, Family],
+) -> list[str]:
+    """People who already share a parent with this person."""
+    mine = set(_parent_ids(person, families))
+    if not mine:
+        return []
+    found = []
+    for other in people.values():
+        if other.id == person.id:
+            continue
+        if mine & set(_parent_ids(other, families)):
+            found.append(other.id)
+    return found
+
+
+def _person_sort_key(pid: str, people: dict[str, Person]) -> tuple[str, str, str]:
+    person = people[pid]
+    return (person.surname.casefold(), person.name.casefold(), person.id)
+
+
+def recorded_alternate_surnames(person: Person) -> list[str]:
+    """Parenthetical and slash-separated surnames already written in the record."""
+    surname = re.sub(r"\s+", " ", person.surname or "").strip()
+    if not surname:
+        return []
+    extras: list[str] = []
+    for match in re.finditer(r"\(([^)]*)\)", surname):
+        for part in match.group(1).split(","):
+            part = part.strip()
+            if part:
+                extras.append(part)
+    without = re.sub(r"\s*\([^)]*\)", "", surname).strip()
+    parts = [part.strip() for part in re.split(r"\s*/\s*", without) if part.strip()]
+    if len(parts) > 1:
+        extras.extend(parts)
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in extras:
+        if item == surname or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def public_birth(person: Person) -> str:
+    """Birth text safe to publish. Living people keep a year, or nothing."""
+    if person.is_living:
+        return year_only(person.birt)
+    return format_date(person.birt)
+
+
+def public_death(person: Person) -> str:
+    if person.is_living:
+        return ""
+    return format_date(person.deat)
+
+
+def public_life_brief(person: Person) -> str:
+    """Compact public dates. Missing dates produce no placeholder."""
+    birth = public_birth(person)
+    death = public_death(person)
+    if person.is_living:
+        return f"р. {birth}" if birth else "ныне живущий"
+    if birth and death:
+        return f"{birth} – {death}"
+    if birth:
+        return f"р. {birth}"
+    if death:
+        return f"ум. {death}"
+    return ""
+
+
+def public_birth_place(person: Person) -> str:
+    if person.is_living:
+        return ""
+    return canonical_place(person.birt_plac)
+
+
+def public_residence(person: Person) -> str:
+    if person.is_living:
+        return ""
+    return canonical_place(person.residence)
+
+
+def public_death_place(person: Person) -> str:
+    if person.is_living:
+        return ""
+    return canonical_place(person.deat_plac)
+
+
+PLACE_RELATION_LABELS = {
+    "birth": "Место рождения",
+    "last_residence": "Последний адрес",
+    "marriage": "Место брака",
+}
+
+
+def editorial_place_facts(
+    content: dict[str, Any],
+    published: set[str],
+) -> dict[str, list[tuple[str, str]]]:
+    """Move facts from former place notes to cards without copying them into YAML data."""
+    facts: dict[str, list[tuple[str, str]]] = {}
+    seen: set[tuple[str, str, str]] = set()
+    for section in content["sections"].values():
+        for place in section["places"]["items"]:
+            for association in place.get("people", []):
+                person_id = association["id"]
+                label = PLACE_RELATION_LABELS.get(association["relation"], "")
+                key = (person_id, label, place["name"])
+                if person_id not in published or not label or key in seen:
+                    continue
+                seen.add(key)
+                facts.setdefault(person_id, []).append((label, place["name"]))
+    return facts
+
+
+def _render_fact(label: str, value_html: str) -> str:
+    if not value_html or not value_html.strip():
+        return ""
+    return f"<div><dt>{esc(label)}</dt><dd>{value_html}</dd></div>"
+
+
+def _render_related_people(
+    ids: list[str],
+    people: dict[str, Person],
+    published: set[str],
+) -> str:
+    """Names of relatives. A published person links to the stable card."""
+    if not ids:
+        return ""
+    items = []
+    for pid in sorted(dict.fromkeys(ids), key=lambda item: _person_sort_key(item, people)):
+        if pid not in people:
+            continue
+        person = people[pid]
+        brief = public_life_brief(person)
+        text = esc(person.display_name)
+        if brief:
+            text += f" ({esc(brief)})"
+        if pid in published:
+            text = f'<a href="#person-{esc(pid)}">{text}</a>'
+        items.append(f"<li>{text}</li>")
+    if not items:
+        return ""
+    return f"<ul>{''.join(items)}</ul>"
+
+
+def _render_related_links(
+    ids: list[str],
+    people: dict[str, Person],
+    published: set[str],
+) -> str:
+    links = []
+    available = {pid for pid in ids if pid in published}
+    for pid in sorted(available, key=lambda item: _person_sort_key(item, people)):
+        links.append(f'<a href="#person-{esc(pid)}">{esc(people[pid].display_name)}</a>')
+    return " · ".join(links)
+
+
+def render_tree_actions(
+    person_id: str,
+    section_links: list[tuple[str, str]],
+    tree_cards: dict[str, dict[str, str]],
+    label: str,
+) -> str:
+    """Links that open a family tree already containing this person."""
+    found: list[tuple[str, str, str]] = []
+    for key, title in section_links:
+        card = tree_cards.get(key, {}).get(person_id)
+        if card:
+            found.append((key, title, card))
+    if not found:
+        return ""
+    links = []
+    for key, title, card in found:
+        text = label if len(found) == 1 else f"{label} · {title}"
+        links.append(
+            f'<a href="#{esc(key)}-tree" data-show-tree="{esc(key)}" '
+            f'data-card-id="{esc(card)}">{esc(text)}</a>'
+        )
+    return f'<p class="person-actions">{"".join(links)}</p>'
+
+
+def render_person_card(
+    person: Person,
+    people: dict[str, Person],
+    families: dict[str, Family],
+    content: dict[str, Any],
+    section_links: list[tuple[str, str]],
+    tree_cards: dict[str, dict[str, str]],
+    published: set[str],
+    place_facts: list[tuple[str, str]],
+) -> str:
+    """One person card addressed by the existing person id.
+
+    Photos and memories are not rendered. ``note`` is an imported line that
+    already contains an exact date and a technical mark, including for living
+    people, so it is not a public biography or research comment. ``source``
+    on the record is the technical mark ``import``, not a citation.
+    Empty rows are omitted; no biography is composed from the links.
+    """
+    back = "".join(
+        f'<a href="#{esc(section_key)}-people">{esc(title)}</a>'
+        for section_key, title in section_links
+    )
+    editorial_facts = []
+    if not person.is_living:
+        editorial_facts.append(
+            _render_fact(
+                "Семейные сведения",
+                esc(content.get("person_biographies", {}).get(person.id, "")),
+            )
+        )
+    for label, place in place_facts:
+        # Places of living people stay out of the card, including marriage.
+        if person.is_living:
+            continue
+        editorial_facts.append(_render_fact(label, esc(place)))
+    facts = "".join((
+        _render_fact("Другие записанные фамилии", esc(", ".join(recorded_alternate_surnames(person)))),
+        _render_fact("Статус", esc(content["tree"]["status"]["hyp"]) if person.is_hypothesis else ""),
+        _render_fact("Рождение", esc(public_birth(person))),
+        _render_fact("Смерть", esc(public_death(person))),
+        _render_fact("Место рождения", esc(public_birth_place(person))),
+        _render_fact("Место проживания", esc(public_residence(person))),
+        _render_fact("Место смерти", esc(public_death_place(person))),
+        *editorial_facts,
+        _render_fact("Родители", _render_related_people(_parent_ids(person, families), people, published)),
+        _render_fact("Супруги", _render_related_people(_spouse_ids(person, families), people, published)),
+        _render_fact("Дети", _render_related_people(_child_ids(person, families), people, published)),
+        _render_fact(
+            "Братья и сёстры",
+            _render_related_people(sibling_ids(person, people, families), people, published),
+        ),
+        _render_fact("Профессия и образование", esc(person.occu)),
+    ))
+    facts_html = f'<dl class="person-facts">{facts}</dl>' if facts else ""
+    actions = render_tree_actions(
+        person.id,
+        section_links,
+        tree_cards,
+        content["archive_search"]["show_in_tree"],
+    )
+    return (
+        f'<article class="person-card" id="person-{esc(person.id)}" '
+        f'data-person-id="{esc(person.id)}">'
+        f'<div class="wrap"><p class="person-back">{back}</p>'
+        f"<h1>{esc(person.display_name)}</h1>{facts_html}{actions}</div></article>\n"
+    )
+
+
+def render_person_cards_page(
+    people: dict[str, Person],
+    families: dict[str, Family],
+    content: dict[str, Any],
+    membership: dict[str, list[tuple[str, str]]],
+    tree_cards: dict[str, dict[str, str]],
+) -> str:
+    """One adaptive sheet per published person, addressed by person id."""
+    published = set(membership)
+    place_facts = editorial_place_facts(content, published)
+    cards = []
+    for pid in sorted(membership, key=lambda item: _person_sort_key(item, people)):
+        cards.append(
+            render_person_card(
+                people[pid],
+                people,
+                families,
+                content,
+                membership[pid],
+                tree_cards,
+                published,
+                place_facts.get(pid, []),
+            )
+        )
+    return f'<div class="page" id="page-persons">\n{"".join(cards)}</div>\n\n'
+
+
+def svg_person_cards(svg: str) -> dict[str, str]:
+    """Map a person id to the tree-card id actually drawn in one SVG."""
+    return {
+        person_id: card_id
+        for card_id, person_id in re.findall(
+            r'id="([^"]+)" class="bx[^"]*" href="#person-[^"]+" data-person-id="([^"]+)"',
+            svg,
+        )
+    }
+
+
+def public_search_records(
+    people: dict[str, Person],
+    membership: dict[str, list[tuple[str, str]]],
+    tree_cards: dict[str, dict[str, str]],
+) -> list[dict[str, Any]]:
+    """Rows for the public search index.
+
+    Names, public life dates and section labels only. Notes, places and
+    non-public dates are not copied into the index.
+    """
+    records = []
+    for pid in sorted(membership, key=lambda item: _person_sort_key(item, people)):
+        person = people[pid]
+        sections = [{"key": key, "title": title} for key, title in membership[pid]]
+        trees = []
+        for key, title in membership[pid]:
+            card = tree_cards.get(key, {}).get(pid)
+            if card:
+                trees.append({"key": key, "title": title, "card": card})
+        records.append({
+            "id": person.id,
+            "name": person.display_name,
+            "search": person_search_text(person),
+            "years": public_life_brief(person),
+            "sections": sections,
+            "trees": trees,
+        })
+    return records
+
+
+def render_person_index(records: list[dict[str, Any]]) -> str:
+    payload = json.dumps(records, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    return f'<script type="application/json" id="person-index">{payload}</script>\n'
+
+
+def render_family_people(section_key: str, listed: list[Person]) -> str:
+    """Name index for one section. Each item opens that person's stable card."""
+    items = []
+    for person in listed:
+        brief = public_life_brief(person)
+        years = f'<span class="person-years">{esc(brief)}</span>' if brief else ""
+        items.append(
+            f'<li><a href="#person-{esc(person.id)}">'
+            f'<span class="person-name">{esc(person.display_name)}</span>{years}</a></li>'
+        )
+    return f"""<section id="{esc(section_key)}-people">
+  <div class="wrap">
+    <div class="sect-head">
+      <h2>Персоны</h2>
+      <div class="hr"></div>
+    </div>
+    <ul class="person-index">{"".join(items)}</ul>
+  </div>
+</section>
+"""
+
+
+def render_part_page(
+    page_id: str,
+    section_key: str,
+    section: dict[str, Any],
+    inner: str,
+) -> str:
+    """One semantic part of a family section, with the same five-way navigation."""
+    if not inner:
+        return ""
+    return (
+        f'<div class="page" id="{esc(page_id)}">\n'
+        f"{render_section_nav(section_key, section)}{inner}</div>\n\n"
+    )
+
+
 def render_home_page(content: dict[str, Any]) -> str:
-    """Approved hero, compact project note and two equal archive entrances."""
+    """Approved hero, founder note and two equal archive entrances.
+
+    Branch descriptions stay in the family sections. Archive search lives in
+    the navigation, not in this page.
+    """
     about = content["about"]
     archive = content["archive"]
     entries = "".join(
         f'<a class="card family-entry" href="#{esc(key)}">'
         f'<div class="tag">Семейный раздел</div><h3>{esc(section["title"])}</h3>'
-        f'<p>{esc(section["entry"])}</p>'
         f'<span class="entry-link">{esc(archive["entry_link"])}</span></a>'
         for key, section in content["sections"].items()
     )
@@ -2168,14 +2692,13 @@ def render_home_page(content: dict[str, Any]) -> str:
 
 
 def render_section_nav(section_key: str, section: dict[str, Any]) -> str:
-    """Consistent navigation within a family section and its tree."""
+    """Five semantic parts. Chronicle stays reachable by its own anchor, not here."""
     links = [
-        (f"#{section_key}", "Обзор"),
-        (f"#{section_key}-branches", "Ветви"),
-        (f"#{section_key}-tree", "Древо"),
-        (f"#{section_key}-sources", section["sources"]["label"]),
-        (f"#{section_key}-places", section["places"]["label"]),
-        (f"#{section_key}-timeline", section["chronicle"]["label"]),
+        (f"#{section_key}-branches", "Родовые ветви"),
+        (f"#{section_key}-tree", "Генеалогическое древо"),
+        (f"#{section_key}-people", "Персоны"),
+        (f"#{section_key}-sources", "Документы"),
+        (f"#{section_key}-places", "Географический указатель"),
     ]
     if section["gallery"]["photos"]:
         links.append((f"#{section_key}-gallery", section["gallery"]["title"]))
@@ -2183,7 +2706,12 @@ def render_section_nav(section_key: str, section: dict[str, Any]) -> str:
     return f'<div class="section-nav"><div class="wrap">{items}</div></div>\n'
 
 
-def render_family_sources(section_key: str, sources: dict[str, Any]) -> str:
+def render_family_sources(
+    section_key: str,
+    sources: dict[str, Any],
+    people: dict[str, Person],
+    published: set[str],
+) -> str:
     documents = []
     for item in sources["items"]:
         meta = " · ".join(esc(value) for value in (item["kind"], item.get("date", "")) if value)
@@ -2196,47 +2724,83 @@ def render_family_sources(section_key: str, sources: dict[str, Any]) -> str:
                 f'<img src="{esc(item["image"]["src"])}" alt="{esc(item["image"]["alt"])}" '
                 'loading="lazy">'
             )
-        documents.append(
-            f'<article class="document"><div class="kind">{meta}</div>'
-            f'<h3>{esc(item["title"])}</h3>{reference}'
-            f'{paragraphs_html(item.get("paragraphs", []))}{image}</article>'
+        related = _render_related_links(item.get("people", []), people, published)
+        related_html = (
+            f'<p class="document-related"><b>Связанные персоны:</b> {related}</p>'
+            if related else ""
         )
-    archives = "".join(f"<li>{rich(item)}</li>" for item in sources["archives"])
-    archive_block = ""
-    if archives:
-        archive_block = (
-            f'<div class="archive-directions"><h3>{esc(sources["archives_title"])}</h3>'
-            f'<ul>{archives}</ul></div>'
+        documents.append(
+            f'<article class="document" id="{esc(item["id"])}"><div class="kind">{meta}</div>'
+            f'<h3>{esc(item["title"])}</h3>{reference}'
+            f'{paragraphs_html(item.get("paragraphs", []))}{related_html}{image}</article>'
         )
     return f"""<section class="src" id="{esc(section_key)}-sources">
   <div class="wrap">
     <div class="sect-head">
-      <div class="label">{esc(sources["label"])}</div>
       <h2>{esc(sources["title"])}</h2>
       <div class="hr"></div>
     </div>
     <div class="documents">{"".join(documents)}</div>
-    {archive_block}
   </div>
 </section>
 
 """
 
 
-def render_family_places(section_key: str, places: dict[str, Any]) -> str:
-    items = "".join(
-        f'<article class="place-item"><h3>{esc(item["name"])}</h3>'
-        f'<p>{esc(item["note"])}</p></article>'
-        for item in places["items"]
-    )
+def render_family_places(
+    section_key: str,
+    places: dict[str, Any],
+    documents: dict[str, dict[str, Any]],
+    people: dict[str, Person],
+    published: set[str],
+) -> str:
+    items = []
+    for item in places["items"]:
+        match = item.get("match", item["name"])
+        source_ids = [entry["id"] for entry in item.get("people", [])]
+        related_ids = [
+            pid for pid in source_ids
+            if pid in published and pid in people and not people[pid].is_living
+        ]
+        for pid in published:
+            person = people[pid]
+            if person.is_living:
+                continue
+            if match in (public_birth_place(person), public_residence(person), public_death_place(person)):
+                related_ids.append(pid)
+        # A settlement listed only for living people is itself a place leak.
+        living_only = bool(source_ids) and all(
+            pid in people and people[pid].is_living for pid in source_ids
+        )
+        has_documents = any(
+            document_id in documents for document_id in item.get("documents", [])
+        )
+        if living_only and not related_ids and not has_documents:
+            continue
+        related = _render_related_links(related_ids, people, published)
+        related_html = f'<p><b>Персоны:</b> {related}</p>' if related else ""
+        document_links = " · ".join(
+            f'<a href="#{esc(document_id)}">{esc(documents[document_id]["title"])}</a>'
+            for document_id in item.get("documents", [])
+            if document_id in documents
+        )
+        documents_html = f'<p><b>Документы:</b> {document_links}</p>' if document_links else ""
+        note_html = f'<p>{esc(item["note"])}</p>' if item.get("note") else ""
+        name_html = f'<h3>{esc(item["name"])}</h3>'
+        if related_html or documents_html or note_html:
+            items.append(
+                f'<details class="place-item" id="{esc(item["id"])}">'
+                f'<summary>{name_html}</summary>{note_html}{related_html}{documents_html}</details>'
+            )
+        else:
+            items.append(f'<article class="place-item" id="{esc(item["id"])}">{name_html}</article>')
     return f"""<section class="alt" id="{esc(section_key)}-places">
   <div class="wrap">
     <div class="sect-head">
-      <div class="label">{esc(places["label"])}</div>
       <h2>{esc(places["title"])}</h2>
       <div class="hr"></div>
     </div>
-    <div class="place-list">{items}</div>
+    <div class="place-list">{"".join(items)}</div>
   </div>
 </section>
 
@@ -2281,7 +2845,6 @@ def render_family_gallery(section_key: str, gallery: dict[str, Any]) -> str:
     return f"""<section class="alt" id="{esc(section_key)}-gallery">
   <div class="wrap">
     <div class="sect-head">
-      <div class="label">{esc(gallery["title"])}</div>
       <h2>{esc(gallery["title"])}</h2>
       <div class="hr"></div>
     </div>
@@ -2292,7 +2855,21 @@ def render_family_gallery(section_key: str, gallery: dict[str, Any]) -> str:
 """
 
 
-def render_family_page(
+def render_family_hub(section_key: str, section: dict[str, Any]) -> str:
+    """Short entrance to a family section. The materials live in their own parts."""
+    return f"""<div class="page" id="{esc(section["page_id"])}">
+<section class="pagehead" id="{esc(section_key)}">
+  <div class="wrap">
+    <h1>{esc(section["title"])}</h1>
+    <p class="sub">{esc(section["lead"])}</p>
+  </div>
+</section>
+{render_section_nav(section_key, section)}</div>
+
+"""
+
+
+def render_family_branches(
     section_key: str,
     section: dict[str, Any],
     archive: dict[str, Any],
@@ -2313,16 +2890,7 @@ def render_family_page(
   </div>
   <div class="grid g2">{extra_cards}</div>
 </div>"""
-    return f"""<div class="page" id="{esc(section["page_id"])}">
-<section class="pagehead" id="{esc(section_key)}">
-  <div class="wrap">
-    <div class="label">Семейный раздел</div>
-    <h1>{esc(section["title"])}</h1>
-    <p class="sub">{esc(section["lead"])}</p>
-  </div>
-</section>
-{render_section_nav(section_key, section)}
-<section id="{esc(section_key)}-branches">
+    return f"""<section id="{esc(section_key)}-branches">
   <div class="wrap">
     <div class="sect-head">
       <div class="label">{esc(section["branches_label"])}</div>
@@ -2333,12 +2901,6 @@ def render_family_page(
 {collateral}
   </div>
 </section>
-{render_family_sources(section_key, section["sources"])}
-{render_family_places(section_key, section["places"])}
-{render_family_chronicle(section_key, section["chronicle"])}
-{render_family_gallery(section_key, section["gallery"])}
-</div>
-
 """
 
 
@@ -2347,19 +2909,21 @@ def render_tree_page(
     section: dict[str, Any],
     tree: dict[str, Any],
     pedigree_svg: str,
+    archive_search: dict[str, Any],
 ) -> str:
     """One pedigree with scoped public search and independent view controls."""
     search = tree["search"]
     controls = tree["controls"]
     search_id = f"search-{section_key}"
     results_id = f"results-{section_key}"
-    return f"""<div class="page" id="{esc(section["tree_page_id"])}">
+    return f"""<div class="page page-tree" id="{esc(section["tree_page_id"])}">
+<div class="tree-stack" id="{esc(section_key)}-tree">
 {render_section_nav(section_key, section)}
-<section class="pagehead tree-pagehead" id="{esc(section_key)}-tree">
+<section class="pagehead tree-pagehead">
   <div class="wrap">
     <h1>{esc(section["tree_title"])}</h1>
     <div class="tree-toolbar">
-      <div class="tree-search" data-search-tree="{esc(section_key)}">
+      <div class="tree-search" data-search-tree="{esc(section_key)}" data-no-results="{esc(search["no_results"])}" data-no-results-all="{esc(archive_search["no_results"])}" data-in-tree="{esc(archive_search["in_tree"])}">
         <label class="sr-only" for="{search_id}">{esc(search["label"])}</label>
         <div class="search-fields">
           <input id="{search_id}" type="search" placeholder="{esc(search["placeholder"])}" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{results_id}">
@@ -2379,18 +2943,22 @@ def render_tree_page(
         <button type="button" class="tree-view-button" data-tree-action="reset">{esc(controls["reset"])}</button>
       </div>
     </div>
-    <div class="legend" aria-label="Условные обозначения">
-      <span><i class="unknown" aria-hidden="true">?</i>{esc(tree["legend"]["unknown"])}</span>
-      <span><i class="approx" aria-hidden="true">ок.</i>{esc(tree["legend"]["approx"])}</span>
-      <span><i class="ok" aria-hidden="true"></i>{esc(tree["legend"]["ok"])}</span>
-      <span><i class="hyp" aria-hidden="true"></i>{esc(tree["legend"]["hyp"])}</span>
-      <span><i class="q" aria-hidden="true"></i>{esc(tree["legend"]["q"])}</span>
-    </div>
+    <details class="legend">
+      <summary>Условные обозначения</summary>
+      <div class="legend-items">
+        <span><i class="unknown" aria-hidden="true">?</i>{esc(tree["legend"]["unknown"])}</span>
+        <span><i class="approx" aria-hidden="true">ок.</i>{esc(tree["legend"]["approx"])}</span>
+        <span><i class="ok" aria-hidden="true"></i>{esc(tree["legend"]["ok"])}</span>
+        <span><i class="hyp" aria-hidden="true"></i>{esc(tree["legend"]["hyp"])}</span>
+        <span><i class="q" aria-hidden="true"></i>{esc(tree["legend"]["q"])}</span>
+      </div>
+    </details>
   </div>
 </section>
 <section class="treewrap" tabindex="0" role="region" aria-label="{esc(section["tree_title"])}" data-tree="{esc(section_key)}" data-section-title="{esc(section["title"])}" data-no-results="{esc(search["no_results"])}">
   <div class="tree-stage">{pedigree_svg}</div>
 </section>
+</div>
 </div>
 
 """
@@ -2442,6 +3010,7 @@ function applyTreeScale(view, requested) {
   view.svg.style.width = (view.baseWidth * next) + 'px';
   view.svg.style.height = (view.baseHeight * next) + 'px';
   view.wrap.setAttribute('data-scale', next.toFixed(3));
+  view.wrap.setAttribute('data-detail', next < 0.45 ? 'compact' : 'full');
   var output = document.querySelector('[data-controls-tree="' + view.key + '"] [data-zoom-value]');
   if (output) output.textContent = Math.round(next * 100) + '%';
 }
@@ -2462,6 +3031,10 @@ function zoomTree(view, factor, clientX, clientY) {
 
 function fitTree(view) {
   if (!view.wrap.closest('.page').classList.contains('visible')) return;
+  view.stage.style.paddingLeft = '';
+  view.stage.style.paddingRight = '';
+  view.stage.style.paddingTop = '';
+  view.stage.style.paddingBottom = '';
   var style = getComputedStyle(view.stage);
   var horizontal = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
   var vertical = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
@@ -2475,6 +3048,10 @@ function fitTree(view) {
 }
 
 function resetTree(view) {
+  view.stage.style.paddingLeft = '';
+  view.stage.style.paddingRight = '';
+  view.stage.style.paddingTop = '';
+  view.stage.style.paddingBottom = '';
   applyTreeScale(view, 1);
   view.wrap.scrollLeft = 0;
   view.wrap.scrollTop = 0;
@@ -2491,12 +3068,44 @@ function focusTreeCard(focus) {
   var card = document.getElementById(focus.cardId);
   if (!view || !card) return;
   clearTreeHighlight();
-  var wrapRect = view.wrap.getBoundingClientRect();
-  var cardRect = card.getBoundingClientRect();
-  view.wrap.scrollLeft += cardRect.left + cardRect.width / 2 - wrapRect.left - view.wrap.clientWidth / 2;
-  view.wrap.scrollTop += cardRect.top + cardRect.height / 2 - wrapRect.top - view.wrap.clientHeight / 2;
-  card.classList.add('search-hit');
-  view.wrap.focus({preventScroll: true});
+  var gutterX = Math.ceil(view.wrap.clientWidth / 2);
+  var gutterY = Math.ceil(view.wrap.clientHeight / 2);
+  view.stage.style.paddingLeft = gutterX + 'px';
+  view.stage.style.paddingRight = gutterX + 'px';
+  view.stage.style.paddingTop = gutterY + 'px';
+  view.stage.style.paddingBottom = gutterY + 'px';
+  applyTreeScale(view, 1);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      var wrapRect = view.wrap.getBoundingClientRect();
+      var cardRect = card.getBoundingClientRect();
+      view.wrap.scrollLeft += cardRect.left + cardRect.width / 2 - wrapRect.left - view.wrap.clientWidth / 2;
+      view.wrap.scrollTop += cardRect.top + cardRect.height / 2 - wrapRect.top - view.wrap.clientHeight / 2;
+      card.classList.add('search-hit');
+      view.wrap.focus({preventScroll: true});
+    });
+  });
+}
+
+function openPerson(id) {
+  if (!id) return;
+  if (window.location.hash === '#person-' + id) resolveRoute();
+  else window.location.hash = 'person-' + id;
+}
+
+function showPersonInTree(tree, cardId) {
+  var focus = {tree: tree, cardId: cardId};
+  document.querySelectorAll('.search-results').forEach(function(node) { node.hidden = true; });
+  document.querySelectorAll('input[aria-expanded="true"]').forEach(function(input) {
+    input.setAttribute('aria-expanded', 'false');
+  });
+  if (window.location.hash === '#' + tree + '-tree') {
+    pendingTreeFocus = null;
+    requestAnimationFrame(function() { focusTreeCard(focus); });
+  } else {
+    pendingTreeFocus = focus;
+    window.location.hash = tree + '-tree';
+  }
 }
 
 function initTree(wrap) {
@@ -2531,6 +3140,7 @@ function initTree(wrap) {
   var pointers = new Map();
   var drag = null;
   var pinch = null;
+  var tap = null;
 
   function pointerPair() {
     return Array.from(pointers.values()).slice(0, 2);
@@ -2558,8 +3168,10 @@ function initTree(wrap) {
     wrap.classList.add('is-panning');
     if (pointers.size === 1) {
       drag = {id: event.pointerId, x: event.clientX, y: event.clientY, left: wrap.scrollLeft, top: wrap.scrollTop};
+      tap = {id: event.pointerId, x: event.clientX, y: event.clientY, moved: false};
       pinch = null;
     } else if (pointers.size === 2) {
+      tap = null;
       startPinch();
     }
     event.preventDefault();
@@ -2568,6 +3180,10 @@ function initTree(wrap) {
   wrap.addEventListener('pointermove', function(event) {
     if (!pointers.has(event.pointerId)) return;
     pointers.set(event.pointerId, {id: event.pointerId, x: event.clientX, y: event.clientY});
+    if (tap && tap.id === event.pointerId && Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > 8) {
+      tap.moved = true;
+    }
+    if (pointers.size >= 2) tap = null;
     if (pointers.size >= 2) {
       if (!pinch) startPinch();
       var pair = pointerPair();
@@ -2587,6 +3203,12 @@ function initTree(wrap) {
 
   function endPointer(event) {
     if (!pointers.has(event.pointerId)) return;
+    if (tap && event.pointerId === tap.id && !tap.moved && pointers.size === 1) {
+      var hit = document.elementFromPoint(event.clientX, event.clientY);
+      var node = hit && hit.closest && hit.closest('a.bx[data-person-id]');
+      if (node) openPerson(node.getAttribute('data-person-id'));
+    }
+    if (tap && event.pointerId === tap.id) tap = null;
     pointers.delete(event.pointerId);
     pinch = null;
     drag = null;
@@ -2606,22 +3228,70 @@ function normalizedSearch(value) {
   return (value || '').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/gi, ' ').trim();
 }
 
+function loadPersonIndex() {
+  if (loadPersonIndex.data) return loadPersonIndex.data;
+  var node = document.getElementById('person-index');
+  loadPersonIndex.data = node ? JSON.parse(node.textContent) : [];
+  return loadPersonIndex.data;
+}
+
+function matchPeople(query, scope, treeKey) {
+  var tokens = normalizedSearch(query).split(/\\s+/).filter(Boolean);
+  if (!tokens.length) return [];
+  return loadPersonIndex().filter(function(person) {
+    if (treeKey && !person.trees.some(function(tree) { return tree.key === treeKey; })) return false;
+    if (scope && scope !== 'all' && !person.sections.some(function(section) { return section.key === scope; })) return false;
+    var haystack = normalizedSearch(person.search);
+    return tokens.every(function(token) { return haystack.indexOf(token) !== -1; });
+  }).sort(function(a, b) {
+    return a.name.localeCompare(b.name, 'ru') || a.id.localeCompare(b.id);
+  });
+}
+
 function hideSearchResults(search) {
   var results = search.querySelector('.search-results');
+  if (!results) return;
   results.hidden = true;
-  search.querySelector('input').setAttribute('aria-expanded', 'false');
+  var input = search.querySelector('input');
+  if (input) input.setAttribute('aria-expanded', 'false');
+}
+
+function placementFor(person, preferredTree) {
+  var trees = person.trees || [];
+  var index;
+  for (index = 0; index < trees.length; index++) {
+    if (trees[index].key === preferredTree) return trees[index];
+  }
+  return trees.length ? trees[0] : null;
+}
+
+function appendResultText(parent, person, showSection) {
+  var nameEl = document.createElement('span');
+  nameEl.className = 'result-name';
+  nameEl.textContent = person.name;
+  parent.appendChild(nameEl);
+  if (person.years) {
+    var yearsEl = document.createElement('span');
+    yearsEl.className = 'result-years';
+    yearsEl.textContent = person.years;
+    parent.appendChild(yearsEl);
+  }
+  if (showSection && person.sections && person.sections.length) {
+    var sectionEl = document.createElement('span');
+    sectionEl.className = 'result-section';
+    sectionEl.textContent = person.sections.map(function(section) { return section.title; }).join(' · ');
+    parent.appendChild(sectionEl);
+  }
 }
 
 function chooseSearchResult(search, button) {
-  var focus = {cardId: button.getAttribute('data-card-id'), tree: button.getAttribute('data-tree')};
   hideSearchResults(search);
-  if (window.location.hash === '#' + focus.tree + '-tree') {
-    pendingTreeFocus = null;
-    requestAnimationFrame(function() { focusTreeCard(focus); });
-  } else {
-    pendingTreeFocus = focus;
-    window.location.hash = focus.tree + '-tree';
+  var cardId = button.getAttribute('data-card-id');
+  if (!cardId) {
+    openPerson(button.getAttribute('data-person-id'));
+    return;
   }
+  showPersonInTree(button.getAttribute('data-tree'), cardId);
 }
 
 function renderSearchResults(search) {
@@ -2635,54 +3305,33 @@ function renderSearchResults(search) {
     hideSearchResults(search);
     return;
   }
-  var tokens = query.split(/\\s+/);
-  var matches = [];
-  document.querySelectorAll('.pedigree .bx[data-search]').forEach(function(card) {
-    var tree = card.closest('.treewrap').getAttribute('data-tree');
-    if (scope === 'local' && tree !== localTree) return;
-    var haystack = normalizedSearch(card.getAttribute('data-search'));
-    if (!tokens.every(function(token) { return haystack.indexOf(token) !== -1; })) return;
-    matches.push(card);
-  });
-  matches.sort(function(a, b) {
-    var an = a.getAttribute('data-search');
-    var bn = b.getAttribute('data-search');
-    return an.localeCompare(bn, 'ru') || a.id.localeCompare(b.id);
-  });
-
+  var matches = matchPeople(input.value, 'all', scope === 'local' ? localTree : '');
   if (!matches.length) {
     var empty = document.createElement('div');
     empty.className = 'search-empty';
-    empty.textContent = document.querySelector('.treewrap[data-tree="' + localTree + '"]').getAttribute('data-no-results');
+    empty.textContent = scope === 'global'
+      ? (search.getAttribute('data-no-results-all') || search.getAttribute('data-no-results') || '')
+      : (search.getAttribute('data-no-results') || '');
     results.appendChild(empty);
   }
-  matches.forEach(function(card) {
-    var wrap = card.closest('.treewrap');
-    var tree = wrap.getAttribute('data-tree');
-    var name = Array.from(card.querySelectorAll('.t1, .t2')).map(function(text) {
-      return text.textContent.trim();
-    }).filter(Boolean).join(' ');
+  matches.forEach(function(person) {
+    var placement = placementFor(person, localTree);
     var button = document.createElement('button');
     button.type = 'button';
     button.className = 'search-result';
     button.setAttribute('role', 'option');
     button.setAttribute('aria-selected', 'false');
-    button.setAttribute('data-card-id', card.id);
-    button.setAttribute('data-tree', tree);
-    var nameEl = document.createElement('span');
-    nameEl.className = 'result-name';
-    nameEl.textContent = name;
-    var yearsEl = document.createElement('span');
-    yearsEl.className = 'result-years';
-    yearsEl.textContent = card.getAttribute('data-years');
-    button.appendChild(nameEl);
-    button.appendChild(yearsEl);
-    if (scope === 'global') {
-      var sectionEl = document.createElement('span');
-      sectionEl.className = 'result-section';
-      sectionEl.textContent = wrap.getAttribute('data-section-title');
-      button.appendChild(sectionEl);
+    button.setAttribute('data-person-id', person.id);
+    if (placement && (scope === 'local' || person.trees.length)) {
+      if (scope === 'local' || placement) {
+        button.setAttribute('data-card-id', placement.card);
+        button.setAttribute('data-tree', placement.key);
+      }
     }
+    if (scope !== 'local' && !placement) {
+      button.removeAttribute('data-card-id');
+    }
+    appendResultText(button, person, scope === 'global');
     button.addEventListener('click', function() { chooseSearchResult(search, button); });
     button.addEventListener('keydown', function(event) {
       if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -2696,18 +3345,72 @@ function renderSearchResults(search) {
   input.setAttribute('aria-expanded', 'true');
 }
 
-function initSearch(search) {
+function renderNavResults(search) {
   var input = search.querySelector('input');
-  input.addEventListener('input', function() { renderSearchResults(search); });
-  input.addEventListener('focus', function() { renderSearchResults(search); });
+  var scope = search.querySelector('select').value;
+  var results = search.querySelector('.search-results');
+  var query = normalizedSearch(input.value);
+  results.textContent = '';
+  if (!query) {
+    hideSearchResults(search);
+    return;
+  }
+  var matches = matchPeople(input.value, scope, '');
+  var inTreeLabel = search.getAttribute('data-in-tree') || '';
+  if (!matches.length) {
+    var empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = search.getAttribute('data-no-results') || '';
+    results.appendChild(empty);
+  }
+  matches.forEach(function(person) {
+    var row = document.createElement('div');
+    row.className = 'search-result';
+    row.setAttribute('role', 'option');
+    var open = document.createElement('a');
+    open.className = 'result-open';
+    open.href = '#person-' + person.id;
+    appendResultText(open, person, true);
+    open.addEventListener('click', function() { hideSearchResults(search); });
+    row.appendChild(open);
+    (person.trees || []).forEach(function(tree) {
+      var treeLink = document.createElement('a');
+      treeLink.className = 'result-tree';
+      treeLink.href = '#' + tree.key + '-tree';
+      treeLink.setAttribute('data-show-tree', tree.key);
+      treeLink.setAttribute('data-card-id', tree.card);
+      treeLink.textContent = person.trees.length > 1 ? inTreeLabel + ' · ' + tree.title : inTreeLabel;
+      row.appendChild(treeLink);
+    });
+    results.appendChild(row);
+  });
+  results.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+
+function bindSearchKeys(search, render) {
+  var input = search.querySelector('input');
+  input.addEventListener('input', function() {
+    if (!normalizedSearch(input.value)) clearTreeHighlight();
+    render(search);
+  });
+  input.addEventListener('focus', function() { render(search); });
   input.addEventListener('keydown', function(event) {
-    var first = search.querySelector('.search-result');
+    var first = search.querySelector('button.search-result, a.result-open');
     if (event.key === 'ArrowDown' && first) {
       event.preventDefault();
       first.focus();
-    } else if (event.key === 'Enter' && first) {
-      event.preventDefault();
-      chooseSearchResult(search, first);
+    } else if (event.key === 'Enter') {
+      var open = search.querySelector('a.result-open');
+      var button = search.querySelector('button.search-result');
+      if (open) {
+        event.preventDefault();
+        openPerson(open.getAttribute('href').slice(8));
+        hideSearchResults(search);
+      } else if (button) {
+        event.preventDefault();
+        chooseSearchResult(search, button);
+      }
     } else if (event.key === 'Escape') {
       hideSearchResults(search);
     }
@@ -2715,9 +3418,18 @@ function initSearch(search) {
   input.addEventListener('blur', function() {
     setTimeout(function() {
       if (!search.contains(document.activeElement)) hideSearchResults(search);
-    }, 100);
+    }, 150);
   });
-  search.querySelector('select').addEventListener('change', function() { renderSearchResults(search); });
+  var select = search.querySelector('select');
+  if (select) select.addEventListener('change', function() { render(search); });
+}
+
+function initSearch(search) {
+  bindSearchKeys(search, renderSearchResults);
+}
+
+function initPersonSearch(search) {
+  bindSearchKeys(search, renderNavResults);
 }
 
 function resolveRoute() {
@@ -2733,6 +3445,7 @@ function resolveRoute() {
     candidate.classList.toggle('visible', candidate === page);
   });
   var current = 'about';
+  if (hash.indexOf('person-') === 0) current = '';
   if (hash.indexOf('matyukhiny') === 0) current = 'matyukhiny';
   if (hash.indexOf('skiba') === 0) current = 'skiba';
   document.querySelectorAll('nav .navbtn').forEach(function(link) {
@@ -2745,8 +3458,24 @@ function resolveRoute() {
     }
   });
   syncOverHero();
+  function alignRoute() {
+    if (page.querySelector('.treewrap')) window.scrollTo(0, 0);
+    else target.scrollIntoView({block:'start'});
+  }
+  function clearNavOverlap() {
+    var navEl = document.querySelector('nav');
+    var sectionNav = page.querySelector('.section-nav');
+    if (!navEl || !sectionNav) return;
+    var navBottom = navEl.getBoundingClientRect().bottom;
+    var sectionRect = sectionNav.getBoundingClientRect();
+    if (sectionRect.top < navBottom - 1 && sectionRect.bottom > 0) {
+      window.scrollBy(0, sectionRect.top - navBottom);
+    }
+  }
   requestAnimationFrame(function() {
-    target.scrollIntoView({block:'start'});
+    alignRoute();
+    requestAnimationFrame(function() { clearNavOverlap(); });
+    setTimeout(clearNavOverlap, 60);
     syncOverHero();
     if (pendingTreeFocus) {
       var focus = pendingTreeFocus;
@@ -2758,6 +3487,13 @@ function resolveRoute() {
 
 document.querySelectorAll('.treewrap').forEach(initTree);
 document.querySelectorAll('.tree-search').forEach(initSearch);
+document.querySelectorAll('[data-person-search]').forEach(initPersonSearch);
+document.addEventListener('click', function(event) {
+  var link = event.target.closest('[data-show-tree]');
+  if (!link) return;
+  event.preventDefault();
+  showPersonInTree(link.getAttribute('data-show-tree'), link.getAttribute('data-card-id'));
+});
 window.addEventListener('hashchange', resolveRoute);
 var heroEl = document.querySelector('#page1 .hero');
 if (heroEl && 'IntersectionObserver' in window) {
@@ -2795,14 +3531,78 @@ def build_html(
     css = CSS.read_text(encoding="utf-8") if CSS.exists() else ""
     parts = [
         render_document_start(content["meta"], css),
-        render_nav(content["meta"]),
+        render_nav(content["meta"], content["archive_search"], content["sections"]),
         render_home_page(content),
     ]
 
-    for section_key, section in content["sections"].items():
-        parts.append(render_family_page(section_key, section, content["archive"]))
-
     roots = {"root": family.root, "spouse": family.spouse}
+    section_ids: dict[str, set[str]] = {}
+    for section_key, section in content["sections"].items():
+        anchor = roots[section["root"]]
+        section_ids[section_key] = section_person_ids(anchor.id, people, families)
+
+    membership: dict[str, list[tuple[str, str]]] = {}
+    for section_key, section in content["sections"].items():
+        for pid in section_ids[section_key]:
+            membership.setdefault(pid, []).append((section_key, section["title"]))
+
+    for section_key, section in content["sections"].items():
+        listed = [
+            people[pid]
+            for pid in sorted(section_ids[section_key], key=lambda item: _person_sort_key(item, people))
+        ]
+        parts.append(render_family_hub(section_key, section))
+        parts.append(render_part_page(
+            f"page-{section_key}-branches",
+            section_key,
+            section,
+            render_family_branches(section_key, section, content["archive"]),
+        ))
+        parts.append(render_part_page(
+            f"page-{section_key}-people",
+            section_key,
+            section,
+            render_family_people(section_key, listed),
+        ))
+        parts.append(render_part_page(
+            f"page-{section_key}-sources",
+            section_key,
+            section,
+            render_family_sources(
+                section_key,
+                section["sources"],
+                people,
+                section_ids[section_key],
+            ),
+        ))
+        parts.append(render_part_page(
+            f"page-{section_key}-places",
+            section_key,
+            section,
+            render_family_places(
+                section_key,
+                section["places"],
+                {item["id"]: item for item in section["sources"]["items"]},
+                people,
+                section_ids[section_key],
+            ),
+        ))
+        parts.append(render_part_page(
+            f"page-{section_key}-timeline",
+            section_key,
+            section,
+            render_family_chronicle(section_key, section["chronicle"]),
+        ))
+        gallery = render_family_gallery(section_key, section["gallery"])
+        if gallery:
+            parts.append(render_part_page(
+                f"page-{section_key}-gallery",
+                section_key,
+                section,
+                gallery,
+            ))
+
+    tree_cards: dict[str, dict[str, str]] = {}
     for section_key, section in content["sections"].items():
         root = roots[section["root"]]
         spouse = family.spouse if root.id == family.root.id else family.root
@@ -2819,15 +3619,19 @@ def build_html(
             id_prefix=id_prefix,
             description=section["tree_lead"],
         )
+        tree_cards[section_key] = svg_person_cards(pedigree_svg)
         parts.append(
             render_tree_page(
                 section_key,
                 section,
                 content["tree"],
                 pedigree_svg,
+                content["archive_search"],
             )
         )
 
+    parts.append(render_person_cards_page(people, families, content, membership, tree_cards))
+    parts.append(render_person_index(public_search_records(people, membership, tree_cards)))
     parts.extend([render_footer(content["footer"]), render_page_script()])
     return "".join(parts)
 
@@ -2881,13 +3685,27 @@ def main() -> None:
                 formatted = format_date(person.birt)
                 if formatted and len(formatted) > 4 and formatted in html_content:
                     raise ValueError(f"CRITICAL PRIVACY LEAK: Formatted birth date '{formatted}' of living person {person.id} ({person.label}) leaked into generated HTML!")
-            if person.birt_plac:
-                # Birthplace of living people must not leak into the output.
-                # Since place names like "Дмитров" or "Химки" are mentioned in general historical texts,
-                # we only trigger an error if the birthplace is rendered in direct association with the person,
-                # or if a specific public_place check is violated (public_place must be empty for living).
-                if person.public_place:
-                    raise ValueError(f"CRITICAL PRIVACY LEAK: public_place is not empty for living person {person.id} ({person.label}): '{person.public_place}'")
+            if person.birt_plac and person.public_place:
+                raise ValueError(
+                    f"CRITICAL PRIVACY LEAK: public_place is not empty for living person {person.id}"
+                )
+            card_match = re.search(
+                rf'<article class="person-card" id="person-{re.escape(person.id)}"[\s\S]*?</article>',
+                html_content,
+            )
+            if card_match and "<dt>Место" in card_match.group(0):
+                raise ValueError(
+                    f"CRITICAL PRIVACY LEAK: place fact rendered for living person {person.id}"
+                )
+    for block in re.findall(
+        r'<(?:details|article) class="place-item"[\s\S]*?</(?:details|article)>',
+        html_content,
+    ):
+        for person in people.values():
+            if person.is_living and f'#person-{person.id}"' in block:
+                raise ValueError(
+                    f"CRITICAL PRIVACY LEAK: living person {person.id} linked from a place item"
+                )
 
     OUTPUT_PATH.write_text(html_content, encoding="utf-8")
     print(f"Wrote {OUTPUT_PATH} ({OUTPUT_PATH.stat().st_size} bytes)")

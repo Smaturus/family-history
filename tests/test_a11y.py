@@ -36,8 +36,9 @@ def test_search_and_zoom_controls_have_accessible_names(tmp_path):
     """Поля, выбор области и кнопки масштаба имеют явные доступные подписи."""
     code, log, html = build_in_tmp(tmp_path)
     assert code == 0, log
-    assert html.count('role="combobox" aria-autocomplete="list"') == 2
-    assert html.count('aria-label="Область поиска"') == 2
+    assert html.count('role="combobox" aria-autocomplete="list"') == 3
+    assert 'id="archive-search"' in html
+    assert html.count('aria-label="Область поиска"') == 3
     assert html.count('aria-label="Увеличить древо"') == 2
     assert html.count('aria-label="Уменьшить древо"') == 2
     assert html.count('aria-label="Текущий масштаб"') == 2

@@ -173,6 +173,10 @@ class Person:
     famc: str = ""
     email: str = ""
     sources: list[str] = field(default_factory=list)
+    # Reserved for a later publication step. The generator must not render them.
+    photos: list[str] = field(default_factory=list)
+    memories: list[str] = field(default_factory=list)
+    residence: str = ""
     # Anchor year for age-based privacy checks, defaults to date.today().year
     reference_year: int = field(default_factory=lambda: date.today().year)
 
