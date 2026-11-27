@@ -387,6 +387,38 @@ def test_public_search_index_links_cards_and_keeps_private_fields_out(tmp_path):
     assert 'fill="#22252B"' in html
 
 
+def test_search_script_is_inlined_with_shared_results_helper(tmp_path):
+    """Поиск встроен в index.html: оба входа, общая выдача, разные строки, живой без места."""
+    code, log, html = build_in_tmp(tmp_path)
+    assert code == 0, log
+    assert 'id="archive-search"' in html
+    assert html.count('data-search-tree=') == 2
+    assert 'src="assets/search.js"' not in html
+    assert "function presentSearchMatches(" in html
+    assert "function renderSearchResults(" in html
+    assert "function renderNavResults(" in html
+    render_tree = html.split("function renderSearchResults(", 1)[1].split(
+        "function renderNavResults(", 1
+    )[0]
+    render_nav = html.split("function renderNavResults(", 1)[1].split(
+        "function bindSearchKeys(", 1
+    )[0]
+    assert "presentSearchMatches(" in render_tree
+    assert "presentSearchMatches(" in render_nav
+    assert "button.className = 'search-result'" in render_tree
+    assert "open.className = 'result-open'" not in render_tree
+    assert "treeLink.className = 'result-tree'" not in render_tree
+    assert "open.className = 'result-open'" in render_nav
+    assert "treeLink.className = 'result-tree'" in render_nav
+    assert "button.className = 'search-result'" not in render_nav
+    blob = html.split('id="person-index">', 1)[1].split("</script>", 1)[0]
+    import json
+    living = next(item for item in json.loads(blob) if item["id"] == "t01")
+    assert living["years"] == "р. 1971"
+    assert "place" not in living
+    assert set(living) == {"id", "name", "search", "years", "sections", "trees"}
+
+
 def test_build_fails_cleanly_without_data(tmp_path):
     """Нет data/family.yaml → exit 1, понятное сообщение, без трейсбека."""
     code, log, _ = build_in_tmp(tmp_path, with_data=False)

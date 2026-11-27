@@ -1379,98 +1379,92 @@ function chooseSearchResult(search, button) {
   showPersonInTree(button.getAttribute('data-tree'), cardId);
 }
 
+function presentSearchMatches(search, matches, emptyText, appendMatches) {
+  var input = search.querySelector('input');
+  var results = search.querySelector('.search-results');
+  results.textContent = '';
+  if (!normalizedSearch(input.value)) {
+    hideSearchResults(search);
+    return;
+  }
+  if (!matches.length) {
+    var empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = emptyText;
+    results.appendChild(empty);
+  }
+  appendMatches(results, matches);
+  results.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+}
+
 function renderSearchResults(search) {
   var input = search.querySelector('input');
   var scope = search.querySelector('select').value;
   var localTree = search.getAttribute('data-search-tree');
-  var results = search.querySelector('.search-results');
-  var query = normalizedSearch(input.value);
-  results.textContent = '';
-  if (!query) {
-    hideSearchResults(search);
-    return;
-  }
   var matches = matchPeople(input.value, 'all', scope === 'local' ? localTree : '');
-  if (!matches.length) {
-    var empty = document.createElement('div');
-    empty.className = 'search-empty';
-    empty.textContent = scope === 'global'
-      ? (search.getAttribute('data-no-results-all') || search.getAttribute('data-no-results') || '')
-      : (search.getAttribute('data-no-results') || '');
-    results.appendChild(empty);
-  }
-  matches.forEach(function(person) {
-    var placement = placementFor(person, localTree);
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'search-result';
-    button.setAttribute('role', 'option');
-    button.setAttribute('aria-selected', 'false');
-    button.setAttribute('data-person-id', person.id);
-    if (placement && (scope === 'local' || person.trees.length)) {
-      if (scope === 'local' || placement) {
-        button.setAttribute('data-card-id', placement.card);
-        button.setAttribute('data-tree', placement.key);
+  var emptyText = scope === 'global'
+    ? (search.getAttribute('data-no-results-all') || search.getAttribute('data-no-results') || '')
+    : (search.getAttribute('data-no-results') || '');
+  presentSearchMatches(search, matches, emptyText, function(results, people) {
+    people.forEach(function(person) {
+      var placement = placementFor(person, localTree);
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'search-result';
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', 'false');
+      button.setAttribute('data-person-id', person.id);
+      if (placement && (scope === 'local' || person.trees.length)) {
+        if (scope === 'local' || placement) {
+          button.setAttribute('data-card-id', placement.card);
+          button.setAttribute('data-tree', placement.key);
+        }
       }
-    }
-    if (scope !== 'local' && !placement) {
-      button.removeAttribute('data-card-id');
-    }
-    appendResultText(button, person, scope === 'global');
-    button.addEventListener('click', function() { chooseSearchResult(search, button); });
-    button.addEventListener('keydown', function(event) {
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-      event.preventDefault();
-      var sibling = event.key === 'ArrowDown' ? button.nextElementSibling : button.previousElementSibling;
-      if (sibling && sibling.classList.contains('search-result')) sibling.focus();
+      if (scope !== 'local' && !placement) {
+        button.removeAttribute('data-card-id');
+      }
+      appendResultText(button, person, scope === 'global');
+      button.addEventListener('click', function() { chooseSearchResult(search, button); });
+      button.addEventListener('keydown', function(event) {
+        if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+        event.preventDefault();
+        var sibling = event.key === 'ArrowDown' ? button.nextElementSibling : button.previousElementSibling;
+        if (sibling && sibling.classList.contains('search-result')) sibling.focus();
+      });
+      results.appendChild(button);
     });
-    results.appendChild(button);
   });
-  results.hidden = false;
-  input.setAttribute('aria-expanded', 'true');
 }
 
 function renderNavResults(search) {
   var input = search.querySelector('input');
   var scope = search.querySelector('select').value;
-  var results = search.querySelector('.search-results');
-  var query = normalizedSearch(input.value);
-  results.textContent = '';
-  if (!query) {
-    hideSearchResults(search);
-    return;
-  }
   var matches = matchPeople(input.value, scope, '');
   var inTreeLabel = search.getAttribute('data-in-tree') || '';
-  if (!matches.length) {
-    var empty = document.createElement('div');
-    empty.className = 'search-empty';
-    empty.textContent = search.getAttribute('data-no-results') || '';
-    results.appendChild(empty);
-  }
-  matches.forEach(function(person) {
-    var row = document.createElement('div');
-    row.className = 'search-result';
-    row.setAttribute('role', 'option');
-    var open = document.createElement('a');
-    open.className = 'result-open';
-    open.href = '#person-' + person.id;
-    appendResultText(open, person, true);
-    open.addEventListener('click', function() { hideSearchResults(search); });
-    row.appendChild(open);
-    (person.trees || []).forEach(function(tree) {
-      var treeLink = document.createElement('a');
-      treeLink.className = 'result-tree';
-      treeLink.href = '#' + tree.key + '-tree';
-      treeLink.setAttribute('data-show-tree', tree.key);
-      treeLink.setAttribute('data-card-id', tree.card);
-      treeLink.textContent = person.trees.length > 1 ? inTreeLabel + ' · ' + tree.title : inTreeLabel;
-      row.appendChild(treeLink);
+  presentSearchMatches(search, matches, search.getAttribute('data-no-results') || '', function(results, people) {
+    people.forEach(function(person) {
+      var row = document.createElement('div');
+      row.className = 'search-result';
+      row.setAttribute('role', 'option');
+      var open = document.createElement('a');
+      open.className = 'result-open';
+      open.href = '#person-' + person.id;
+      appendResultText(open, person, true);
+      open.addEventListener('click', function() { hideSearchResults(search); });
+      row.appendChild(open);
+      (person.trees || []).forEach(function(tree) {
+        var treeLink = document.createElement('a');
+        treeLink.className = 'result-tree';
+        treeLink.href = '#' + tree.key + '-tree';
+        treeLink.setAttribute('data-show-tree', tree.key);
+        treeLink.setAttribute('data-card-id', tree.card);
+        treeLink.textContent = person.trees.length > 1 ? inTreeLabel + ' · ' + tree.title : inTreeLabel;
+        row.appendChild(treeLink);
+      });
+      results.appendChild(row);
     });
-    results.appendChild(row);
   });
-  results.hidden = false;
-  input.setAttribute('aria-expanded', 'true');
 }
 
 function bindSearchKeys(search, render) {
